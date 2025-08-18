@@ -1,0 +1,102 @@
+[
+    {
+        "name": "initial_preference_alignment",
+        "description": "Measures the initial alignment of Ana and John's vacation preferences.",
+        "type": "GAUGE",
+        "unit": "percentage",
+        "tags": [
+            {
+                "tag": "agent_name",
+                "description": "The name of the agent (Ana or John)."
+            }
+        ]
+    },
+    {
+        "name": "final_agreement_score",
+        "description": "Evaluates how much the final vacation decision aligns with each agent's preferences.",
+        "type": "GAUGE",
+        "unit": "percentage",
+        "tags": [
+            {
+                "tag": "agent_name",
+                "description": "The name of the agent (Ana or John)."
+            }
+        ]
+    },
+    {
+        "name": "decision_iterations",
+        "description": "Tracks the number of iterations or discussions needed to reach a decision.",
+        "type": "COUNTER",
+        "unit": "iterations",
+        "tags": []
+    },
+    {
+        "name": "influence_score",
+        "description": "Measures the influence each agent had on the final vacation decision.",
+        "type": "GAUGE",
+        "unit": "percentage",
+        "tags": [
+            {
+                "tag": "agent_name",
+                "description": "The name of the agent (Ana or John)."
+            }
+        ]
+    },
+    {
+        "name": "compromise_index",
+        "description": "Measures how much each agent had to compromise from their initial preferences.",
+        "type": "GAUGE",
+        "unit": "percentage",
+        "tags": [
+            {
+                "tag": "agent_name",
+                "description": "The name of the agent (Ana or John)."
+            }
+        ]
+    },
+    {
+        "name": "satisfaction_score",
+        "description": "Measures each agent's satisfaction with the final vacation decision.",
+        "type": "GAUGE",
+        "unit": "score",
+        "tags": [
+            {
+                "tag": "agent_name",
+                "description": "The name of the agent (Ana or John)."
+            }
+        ]
+    },
+    {
+        "name": "time_to_decision",
+        "description": "Measures the time taken to reach a final vacation decision.",
+        "type": "HISTOGRAM",
+        "unit": "minutes",
+        "tags": []
+    },
+    {
+        "name": "flexibility_score",
+        "description": "Measures the willingness of each agent to adapt their preferences during the decision process.",
+        "type": "GAUGE",
+        "unit": "score",
+        "tags": [
+            {
+                "tag": "agent_name",
+                "description": "The name of the agent (Ana or John)."
+            }
+        ]
+    },
+    {
+        "name": "conflict_resolution_rate",
+        "description": "Tracks the frequency and resolution of conflicts during the decision-making process.",
+        "type": "COUNTER",
+        "unit": "conflicts_resolved",
+        "tags": []
+    },
+    {
+        "name": "consensus_level",
+        "description": "Indicates the level of agreement between Ana and John on the final decision.",
+        "type": "GAUGE",
+        "unit": "percentage",
+        "tags": []
+    }
+]

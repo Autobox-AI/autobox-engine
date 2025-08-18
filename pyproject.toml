@@ -7,4 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "openai>=1.99.9",
     "requests>=2.32.4",
+    "thespian>=4.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
 ]

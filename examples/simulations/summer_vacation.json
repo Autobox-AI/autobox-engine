@@ -1,0 +1,73 @@
+{
+    "name": "Summer vacation",
+    "max_steps": 150,
+    "timeout_seconds": 300,
+    "description": "this is a test simulation",
+    "task": "Ana and John need to decide together a destiny for our summer vacation.",
+    "evaluator": {
+        "name": "EVALUATOR",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "reporter": {
+        "name": "REPORTER",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "planner": {
+        "name": "PLANNER",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "orchestrator": {
+        "name": "ORCHESTRATOR",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "workers": [
+        {
+            "name": "ANA",
+            "description": "this is ana agent",
+            "role": "Ana is John's wife.",
+            "backstory": "She is 35 years old and works at Google as a Business Controller. She is passionate about reading and books. She likes food and she started a blog about books and reading. She loves Taylor Swift and she is a Swiftie. For vacation it is a MUST for me to go to montains. If the decision takes longer consider a bit of flexibility. Ana is the most traveller in the couple, she has experience enough to always create amazing trips. Mainly because she has dedicated part of her life to write about countries. Ana is dominant in the couple. Also she has more influence in decisions.",
+            "llm": {
+                "model": "gpt-3.5-turbo"
+            },
+            "mailbox": {
+                "max_size": 100
+            }
+        },
+        {
+            "name": "JOHN",
+            "description": "this is john agent",
+            "role": "John is Ana's husband.",
+            "backstory": "He is 30 years old and works at Apple as a Software Engineer. He is passionate about technology and innovation. He loves to travel and explore new places. He is a big fan of Premier League. Both Ana and John are from London and they live in New York now. Both like Harry Potter books. John attended a Taylor Swift concert with Ana a month ago and he liked it. If the decision takes longer consider a bit of flexibility.",
+            "llm": {
+                "model": "gpt-3.5-turbo"
+            },
+            "mailbox": {
+                "max_size": 100
+            }
+        }
+    ],
+    "logging": {
+        "verbose": false,
+        "log_path": null
+    }
+}
