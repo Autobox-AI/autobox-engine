@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List
 
 from pydantic import BaseModel, Field
+from thespian.actors import ActorSystem
 
 from autobox.core.agents.evaluator import Evaluator
 from autobox.core.agents.orchestrator import Orchestrator
@@ -24,6 +25,7 @@ class Simulator(BaseModel):
     planner: Planner
     reporter: Reporter
     logger: Logger
+    actor_system: ActorSystem
 
     class Config:
         arbitrary_types_allowed = True

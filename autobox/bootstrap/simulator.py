@@ -1,12 +1,15 @@
 import json
 import uuid
 
+from thespian.actors import ActorSystem
+
 from autobox.bootstrap.evaluator import prepare_evaluator
 from autobox.bootstrap.metrics import generate
 from autobox.bootstrap.orchestrator import prepare_orchestrator
 from autobox.bootstrap.planner import prepare_planner
 from autobox.bootstrap.reporter import prepare_reporter
 from autobox.bootstrap.worker import prepare_workers
+from autobox.core.agents.orchestrator import Orchestrator
 from autobox.core.messaging.broker import MessageBroker
 from autobox.core.simulation import Simulation
 from autobox.core.simulator import Simulator
@@ -111,6 +114,9 @@ async def prepare_simulator(config: Config) -> Simulator:
         simulation=simulation,
     )
 
+    actor_system = ActorSystem("multiprocQueueBase")
+    orchestrator_actor = actor_system.createActor(Orchestrator)
+
     simulator = Simulator(
         description=config.simulation.description,
         name=config.simulation.name,
@@ -123,6 +129,7 @@ async def prepare_simulator(config: Config) -> Simulator:
         planner=planner,
         reporter=reporter,
         message_broker=message_broker,
+        actor_system=actor_system,
     )
 
     evaluator.simulation_id = simulation.id

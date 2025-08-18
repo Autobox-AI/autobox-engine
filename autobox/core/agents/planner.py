@@ -6,6 +6,10 @@ from autobox.schemas.planner import PlannerOutput
 class Planner(BaseAgent):
     orchestrator_id: str
 
+    def handle_task(self, message):
+        """Subclasses must implement how to process a message."""
+        pass
+
     async def handle_message(self, message: Message):
         # from autobox.cache.manager import Cache
 

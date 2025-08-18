@@ -5,6 +5,10 @@ from autobox.schemas.message import Message
 class Evaluator(BaseAgent):
     orchestrator_id: str
 
+    def handle_task(self, message):
+        """Subclasses must implement how to process a message."""
+        pass
+
     async def handle_message(self, message: Message):
         self.memory.add_message(message)
 

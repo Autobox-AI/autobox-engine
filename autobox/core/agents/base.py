@@ -1,37 +1,60 @@
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
-from asyncio import Queue
-from typing import Optional
 
-from pydantic import BaseModel, Field
+from thespian.actors import Actor
 
-from autobox.core.ai.llm import LLM
-from autobox.core.messaging.broker import MessageBroker
 from autobox.logging.logger import Logger
 from autobox.schemas.memory import Memory
 from autobox.schemas.message import Message
 
 
-class BaseAgent(BaseModel, ABC):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    simulation_id: str = Field(default=None)
-    name: str
-    mailbox: Queue
-    message_broker: MessageBroker
-    llm: LLM
-    task: str
-    is_end: bool = False
-    logger: Logger = Logger.get_instance()
-    memory: Memory = Field(default=Memory())
-    instruction: Optional[str] = None
+class BaseAgent(Actor, ABC):
+    def __init__(self, **kwargs):
+        super().__init__()
 
-    class Config:
-        arbitrary_types_allowed = True
+        self.id = str(uuid.uuid4())
+        self.simulation_id = None
+        self.name = None
+        self.mailbox = None
+        self.message_broker = None
+        self.llm = None
+        self.task = None
+        self.is_end = False
+        self.logger = Logger.get_instance()
+        self._memory = None
+        self.instruction = None
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @property
+    def memory(self):
+        if self._memory is None:
+            self._memory = Memory()
+        return self._memory
+
+    @memory.setter
+    def memory(self, value):
+        self._memory = value
 
     @abstractmethod
     async def handle_message(self, message: Message):
         pass
+
+    @abstractmethod
+    def handle_task(self, message):
+        """Subclasses must implement how to process a message."""
+        pass
+
+    def receiveMessage(self, message, sender):
+        # Shared receive logic
+        if message == "ping":
+            self.send(sender, "pong")
+        else:
+            result = self.handle_task(message)
+            if result is not None:
+                self.send(sender, result)
 
     async def run(self):
         self.logger.info(f"agent {self.name} ({self.id}) is running")

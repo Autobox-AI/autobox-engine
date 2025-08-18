@@ -15,9 +15,10 @@ def prepare_workers(
 ) -> List[Worker]:
     workers = []
 
-    workers = [
-        Worker(
-            id=worker_ids[worker.name],
+    workers = []
+
+    for worker in config.workers:
+        worker_instance = Worker(
             name=worker.name,
             mailbox=asyncio.Queue(maxsize=worker.mailbox.max_size),
             message_broker=message_broker,
@@ -33,8 +34,9 @@ def prepare_workers(
             backstory=worker.backstory,
             role=worker.role,
         )
-        for worker in config.workers
-    ]
+        # Set the ID after creation
+        worker_instance.id = worker_ids[worker.name]
+        workers.append(worker_instance)
 
     for worker in workers:
         message_broker.subscribe(worker.id, worker.mailbox)

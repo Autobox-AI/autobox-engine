@@ -20,6 +20,10 @@ class Orchestrator(BaseAgent):
     simulation_id: str = None
     simulation: Simulation = None
 
+    def handle_task(self, message):
+        """Subclasses must implement how to process a message."""
+        pass
+
     async def handle_message(self, message: Message):
         self.memory.add_message(message)
 

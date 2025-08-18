@@ -5,13 +5,17 @@ build/
 dist/
 wheels/
 *.egg-info
+.env
+
+# Cursor
+.vscode/
 
 # Virtual environments
 .venv
 
-.env
-
-
 # Claude
 .serena/
 .claude/
+
+# Python
+.pytest_cache/
