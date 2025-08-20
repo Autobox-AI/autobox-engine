@@ -1,7 +1,7 @@
 # Autobox Engine
 
-[![Tests](https://github.com/margostino/autobox/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/margostino/autobox/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/margostino/autobox/branch/main/graph/badge.svg)](https://codecov.io/gh/margostino/autobox)
+[![Tests](https://github.com/margostino/autobox-engine/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/margostino/autobox-engine/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/margostino/autobox-engine/branch/main/graph/badge.svg)](https://codecov.io/gh/margostino/autobox-engine)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 A powerful engine for running dynamic agent-based simulations where AI actors interact, negotiate, and collaborate to explore complex scenarios.
