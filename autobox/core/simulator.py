@@ -1,11 +1,13 @@
 import asyncio
 import time
+from enum import Enum
 
 from thespian.actors import ActorSystem
 
 from autobox.actor.manager import create_actor
 from autobox.bootstrap.id import create_ids
 from autobox.core.agents.orchestrator import Orchestrator
+from autobox.exception.simulation import StopSimulationException
 from autobox.logging.logger import Logger
 from autobox.schemas.actor import Actor, ActorName, ActorStatus
 from autobox.schemas.config import Config
@@ -16,6 +18,12 @@ STATUS_CHECK_TIMEOUT_SECONDS = 5
 MAX_CONSECUTIVE_ERRORS = 3
 
 
+class StatusAction(str, Enum):
+    CONTINUE = "continue"
+    STOP = "stop"
+    SUCCESS = "success"
+
+
 class Simulator:
     def __init__(self, config: Config):
         self.config = config
@@ -23,24 +31,34 @@ class Simulator:
         self.logger: Logger = Logger.get_instance()
         self.orchestrator: Actor = None
         self._from: str = "simulator"
+        self.agent_ids = create_ids(self.config.simulation.workers)
+        self.orchestrator = self.create_orchestrator(self.agent_ids)
 
     async def run(self):
         timeout = self.config.simulation.timeout_seconds
 
-        agent_ids = create_ids(self.config, self.config.simulation.workers)
-
-        self.orchestrator = self.create_orchestrator(agent_ids)
-
-        self.init(config=self.config, agent_ids=agent_ids)
+        self.init(config=self.config, agent_ids=self.agent_ids)
 
         self.start()
 
         self.logger.info("Simulation started")
 
         start_time = time.time()
+
+        last_status = await self.loop_status_until_timeout(timeout, start_time)
+
+        final_elapsed = time.time() - start_time
+        self.logger.info(
+            f"Simulation ending after {final_elapsed:.1f}s with status: {last_status.value}"
+        )
+
+        self.stop_the_world()
+
+        self.logger.info("Simulation finished")
+
+    async def loop_status_until_timeout(self, timeout, start_time) -> ActorStatus:
         last_status = None
         consecutive_errors = 0
-
         while True:
             elapsed_time = time.time() - start_time
 
@@ -51,24 +69,12 @@ class Simulator:
                 break
 
             try:
-                response = self.status()
+                should_continue, status, consecutive_errors = self.check_status(
+                    consecutive_errors, elapsed_time
+                )
 
-                if response is None:
-                    consecutive_errors += 1
-                    self.logger.warning(
-                        f"Received None response from status check ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}) at {elapsed_time:.1f}s"
-                    )
-                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                        self.logger.error(
-                            f"Failed to get status {MAX_CONSECUTIVE_ERRORS} times consecutively. Stopping simulation."
-                        )
-                        break
-                    await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                if should_continue:
                     continue
-
-                status = response.status
-
-                # self.logger.info(f"Orchestrator status: {status.value}")
 
                 consecutive_errors = 0
 
@@ -126,13 +132,29 @@ class Simulator:
             else:
                 await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
-        final_elapsed = time.time() - start_time
-        self.logger.info(
-            f"Simulation ending after {final_elapsed:.1f}s with status: {last_status.value}"
-        )
+        return last_status
 
-        self.stop_the_world()
-        self.logger.info("Simulation finished")
+    def check_status(self, consecutive_errors, elapsed_time):
+        response = self.status()
+
+        if response is None:
+            consecutive_errors += 1
+            self.logger.warning(
+                f"Received None response from status check ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}) at {elapsed_time:.1f}s"
+            )
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                self.logger.error(
+                    f"Failed to get status {MAX_CONSECUTIVE_ERRORS} times consecutively. Stopping simulation."
+                )
+                raise StopSimulationException(
+                    message="Failed to get status multiple times consecutively",
+                    consecutive_errors=consecutive_errors,
+                    elapsed_time=elapsed_time,
+                )
+
+            return True, None, consecutive_errors
+
+        return False, response.status, 0
 
     def create_orchestrator(self, agent_ids: dict):
         return create_actor(
