@@ -1,6 +1,5 @@
 import asyncio
 import time
-from enum import Enum
 
 from thespian.actors import ActorSystem
 
@@ -16,12 +15,6 @@ from autobox.schemas.message import Ack, Init, Signal, SignalMessage, Status
 POLL_INTERVAL_SECONDS = 1
 STATUS_CHECK_TIMEOUT_SECONDS = 5
 MAX_CONSECUTIVE_ERRORS = 3
-
-
-class StatusAction(str, Enum):
-    CONTINUE = "continue"
-    STOP = "stop"
-    SUCCESS = "success"
 
 
 class Simulator:
