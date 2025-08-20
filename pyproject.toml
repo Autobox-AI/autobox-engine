@@ -10,6 +10,10 @@ dependencies = [
     "thespian>=4.0.1",
 ]
 
+[project.scripts]
+autobox = "autobox.cli:main"
+autobox-safe = "autobox.cli:run_with_env"
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",

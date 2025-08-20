@@ -1,18 +1,17 @@
 from asyncio import Queue
 from typing import Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from autobox.logging.logger import Logger
 from autobox.schemas.message import Message
 
 
 class MessageBroker(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     subscribers: Dict[str, Queue] = {}
     logger: Logger = Logger.get_instance()
-
-    class Config:
-        arbitrary_types_allowed = True
 
     def subscribe(self, agent_id: str, mailbox: Queue):
         self.logger.info(f"agent {agent_id} subscribed to message broker")

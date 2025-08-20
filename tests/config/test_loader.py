@@ -7,25 +7,22 @@ from autobox.config.loader import load_simulation_config
 
 
 def test_loader():
-    """Test the configuration loader with the example file."""
-    config = load_simulation_config("examples/simulations/summer_vacation.json")
+    """Test the configuration loader with the test fixture file."""
+    config = load_simulation_config("tests/fixtures/simulations/test_simulation.json")
 
     print(config)
 
     # Assert configuration loaded correctly
-    assert config.name == "Summer vacation"
+    assert config.name == "Test Simulation"
     assert config.max_steps == 150
     assert config.timeout_seconds == 300
-    assert (
-        config.task
-        == "Ana and John need to decide together a destiny for our summer vacation."
-    )
+    assert config.task == "Test task for simulation"
 
     # Check workers
     assert len(config.workers) == 2
     worker_names = [worker.name for worker in config.workers]
-    assert "ANA" in worker_names
-    assert "JOHN" in worker_names
+    assert "WORKER_1" in worker_names
+    assert "WORKER_2" in worker_names
 
     # Check other components
     assert config.orchestrator.name == "ORCHESTRATOR"

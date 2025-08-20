@@ -1,48 +1,96 @@
-from pydantic import Field
+import os
 
-from autobox.core.agents.base import BaseAgent
-from autobox.schemas.message import Message
+from thespian.actors import Actor, ActorExitRequest
+
+from autobox.core.ai.llm import LLM
+from autobox.core.prompts.worker import prompt as system_prompt
+from autobox.logging.logger import Logger
+from autobox.schemas.actor import ActorName, ActorStatus
+from autobox.schemas.config import WorkerConfig
+from autobox.schemas.memory import Memory
+from autobox.schemas.message import Ack, InitAgent, Message, Signal, SignalMessage
 
 
-class Worker(BaseAgent):
-    instruction: str = Field(default=None)
-    backstory: str
-    role: str
+class Worker(Actor):
+    def __init__(self):
+        super().__init__()
+        self.memory = Memory()
+        self.logger: Logger = Logger.get_instance()
+        self.name: str = None
+        self.description: str = None
+        self.instruction: str = None
+        self.backstory: str = None
+        self.role: str = None
+        self.id: str = None
+        self.llm: LLM = None
+        self.status: ActorStatus = None
 
-    def handle_task(self, message):
-        """Subclasses must implement how to process a message."""
-        pass
-
-    async def handle_message(self, message: Message):
-        self.memory.add_message(message)
-
-        if self.finish_if_end(message):
-            return
-
-        to_agent_id = message.from_agent_id
-
-        self.logger.info(
-            f"agent {self.name} ({self.id}) handling message from orchestrator..."
-        )
-
-        chat_completion_messages = [
-            {
-                "role": "user",
-                "content": f"PREVIOUS MESSAGES: {self.memory.model_dump_json()}",
-            },
-            {
-                "role": "user",
-                "content": f"INSTRUCTION FOR THIS ITERATION: {message.value}",
-            },
-        ]
-
-        completion = self.llm.think(chat_completion_messages)
-        value: str = completion.choices[0].message.content
-
-        self.send(
-            Message(
-                from_agent_id=self.id,
-                to_agent_id=to_agent_id,
-                value=value,
+    def receiveMessage(self, message, sender):
+        if isinstance(message, InitAgent):
+            config: WorkerConfig = message.config
+            self.name = config.name
+            self.description = config.description
+            self.instruction = config.instruction
+            self.backstory = config.backstory
+            self.role = config.role
+            self.id = message.id
+            self.llm = LLM(
+                system_prompt=system_prompt(
+                    task=message.task,
+                    backstory=config.backstory,
+                    role=config.role,
+                ),
+                model=config.llm.model,
             )
-        )
+            self.status = ActorStatus.INITIALIZED
+            self.send(
+                sender,
+                Ack(
+                    from_agent=self.name,
+                    to_agent=ActorName.ORCHESTRATOR,
+                    content="initialized",
+                ),
+            )
+            self.logger.info(f"Worker {self.name} initialized (pid: {os.getpid()})")
+        elif isinstance(message, SignalMessage):
+            if message.type == Signal.STOP:
+                self.send(self.myAddress, ActorExitRequest())
+                self.status = ActorStatus.STOPPED
+                self.logger.info(f"Worker {self.name} stopped")
+        elif isinstance(message, Message):
+            self.memory.add_message(message)
+
+            self.logger.info(f"Worker {self.name} is thinking...")
+
+            chat_completion_messages = [
+                {
+                    "role": "user",
+                    "content": f"PREVIOUS MESSAGES: {self.memory.get_history_str()}",
+                },
+                {
+                    "role": "user",
+                    "content": f"INSTRUCTION FOR THIS ITERATION: {message.content}",
+                },
+            ]
+
+            completion = self.llm.think(chat_completion_messages)
+            value: str = completion.choices[0].message.content
+
+            self.send(
+                sender,
+                Message(
+                    from_agent=self.name,
+                    to_agent=ActorName.ORCHESTRATOR,
+                    content=value,
+                ),
+            )
+        else:
+            self.logger.info(f"Worker {self.name} received unknown message: {message}")
+            self.send(
+                sender,
+                SignalMessage(
+                    from_agent=self.name,
+                    to_agent=ActorName.ORCHESTRATOR,
+                    type=Signal.UNKNOWN,
+                ),
+            )

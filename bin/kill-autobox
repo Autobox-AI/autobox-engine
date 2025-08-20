@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Kill all Python processes running autobox
+echo "Searching for autobox-engine processes..."
+
+# Find and count processes
+COUNT=$(ps aux | grep -E "python.*autobox" | grep -v grep | wc -l | tr -d ' ')
+
+if [ "$COUNT" -eq 0 ]; then
+    echo "No autobox-engine processes found."
+    exit 0
+fi
+
+echo "Found $COUNT autobox-engine process(es)."
+echo "Killing processes..."
+
+# Kill all matching processes
+ps aux | grep -E "python.*autobox" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null
+
+# Verify they're gone
+REMAINING=$(ps aux | grep -E "python.*autobox" | grep -v grep | wc -l | tr -d ' ')
+
+if [ "$REMAINING" -eq 0 ]; then
+    echo "Successfully killed all $COUNT autobox-engine process(es)."
+else
+    echo "Warning: $REMAINING process(es) could not be killed."
+    echo "Remaining processes:"
+    ps aux | grep -E "python.*autobox" | grep -v grep
+    exit 1
+fi

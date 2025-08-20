@@ -1,83 +1,184 @@
 import asyncio
-from datetime import datetime
-from typing import List
+import time
 
-from pydantic import BaseModel, Field
 from thespian.actors import ActorSystem
 
-from autobox.core.agents.evaluator import Evaluator
+from autobox.actor.manager import create_actor
+from autobox.bootstrap.id import create_ids
 from autobox.core.agents.orchestrator import Orchestrator
-from autobox.core.agents.planner import Planner
-from autobox.core.agents.reporter import Reporter
-from autobox.core.agents.worker import Worker
-from autobox.core.messaging.broker import MessageBroker
 from autobox.logging.logger import Logger
-from autobox.schemas.message import Message
+from autobox.schemas.actor import Actor, ActorName, ActorStatus
+from autobox.schemas.config import Config
+from autobox.schemas.message import Ack, Init, Signal, SignalMessage, Status
+
+POLL_INTERVAL_SECONDS = 1
+STATUS_CHECK_TIMEOUT_SECONDS = 5
+MAX_CONSECUTIVE_ERRORS = 3
 
 
-class Simulator(BaseModel):
-    timeout: int = Field(default=120)
-    logger: Logger = Logger.get_instance()
-    message_broker: MessageBroker
-    workers: List[Worker]
-    orchestrator: Orchestrator
-    evaluator: Evaluator
-    planner: Planner
-    reporter: Reporter
-    logger: Logger
-    actor_system: ActorSystem
-
-    class Config:
-        arbitrary_types_allowed = True
+class Simulator:
+    def __init__(self, config: Config):
+        self.config = config
+        self.system = ActorSystem("multiprocQueueBase")
+        self.logger: Logger = Logger.get_instance()
+        self.orchestrator: Actor = None
+        self._from: str = "simulator"
 
     async def run(self):
-        self.logger.info("simulation started")
-        self.wakeup()
-        tasks = self.tasks()
+        timeout = self.config.simulation.timeout_seconds
 
-        started_at = datetime.now()
+        agent_ids = create_ids(self.config, self.config.simulation.workers)
 
-        try:
-            await asyncio.wait_for(asyncio.gather(*tasks), timeout=self.timeout)
-        except asyncio.TimeoutError:
-            self.logger.info("simulation ended due to timeout")
-            elapsed_time = self.timeout
-        finally:
-            self.stop()
-            self.logger.info("simulation finished")
-            elapsed_time = int((datetime.now() - started_at).total_seconds())
+        self.orchestrator = self.create_orchestrator(agent_ids)
 
-        self.logger.info(f"elapsed time: {elapsed_time} seconds.")
+        self.init(config=self.config, agent_ids=agent_ids)
 
-    def abort(self):
-        # TODO
-        pass
+        self.start()
 
-    def instruct(self, agent_id: int, instruction: str):
-        # TODO
-        pass
+        self.logger.info("Simulation started")
 
-    def wakeup(self):
-        self.message_broker.publish(
-            Message(value="start", to_agent_id=self.orchestrator.id)
+        start_time = time.time()
+        last_status = None
+        consecutive_errors = 0
+
+        while True:
+            elapsed_time = time.time() - start_time
+
+            if elapsed_time >= timeout:
+                self.logger.warning(
+                    f"Simulation timeout reached after {elapsed_time:.1f}s"
+                )
+                break
+
+            try:
+                response = self.status()
+
+                if response is None:
+                    consecutive_errors += 1
+                    self.logger.warning(
+                        f"Received None response from status check ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}) at {elapsed_time:.1f}s"
+                    )
+                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                        self.logger.error(
+                            f"Failed to get status {MAX_CONSECUTIVE_ERRORS} times consecutively. Stopping simulation."
+                        )
+                        break
+                    await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                    continue
+
+                status = response.status
+
+                # self.logger.info(f"Orchestrator status: {status.value}")
+
+                consecutive_errors = 0
+
+                if status != last_status:
+                    self.logger.info(
+                        f"Simulation status changed: {last_status.value if last_status else None} -> {status.value} ({elapsed_time:.1f}s)"
+                    )
+                    last_status = status
+
+                if status == ActorStatus.COMPLETED:
+                    self.logger.info(
+                        f"Simulation completed successfully after {elapsed_time:.1f}s"
+                    )
+                    break
+
+                if status in [
+                    ActorStatus.STOPPED,
+                    ActorStatus.ERROR,
+                    ActorStatus.ABORTED,
+                    ActorStatus.FAILED,
+                    ActorStatus.UNKNOWN,
+                ]:
+                    self.logger.warning(
+                        f"Simulation ended with status: {status} after {elapsed_time:.1f}s"
+                    )
+                    break
+
+            except asyncio.TimeoutError:
+                consecutive_errors += 1
+                self.logger.warning(
+                    f"Status check timeout ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}) at {elapsed_time:.1f}s"
+                )
+
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    self.logger.error(
+                        f"Failed to get status {MAX_CONSECUTIVE_ERRORS} times consecutively. Stopping simulation."
+                    )
+                    break
+
+            except Exception as e:
+                consecutive_errors += 1
+                self.logger.error(
+                    f"Error checking simulation status: {e} ({elapsed_time:.1f}s)"
+                )
+
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    self.logger.error(
+                        "Too many consecutive errors. Stopping simulation."
+                    )
+                    break
+
+            remaining_time = timeout - elapsed_time
+            if remaining_time < 10:
+                await asyncio.sleep(min(0.5, remaining_time))
+            else:
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+
+        final_elapsed = time.time() - start_time
+        self.logger.info(
+            f"Simulation ending after {final_elapsed:.1f}s with status: {last_status.value}"
         )
 
-    def tasks(self) -> List[asyncio.Task]:
-        return [
-            self.orchestrator.run(),
-            self.evaluator.run(),
-            self.planner.run(),
-            self.reporter.run(),
-        ] + [worker.run() for worker in self.workers]
+        self.stop_the_world()
+        self.logger.info("Simulation finished")
 
-    def stop(self):
-        for worker in self.workers:
-            worker.is_end = True
-        self.orchestrator.is_end = True
-        self.planner.is_end = True
-        self.reporter.is_end = True
-        self.evaluator.is_end = True
-        self.logger.info("simulation stopped")
+    def create_orchestrator(self, agent_ids: dict):
+        return create_actor(
+            system=self.system,
+            actor_class=Orchestrator,
+            name=ActorName.ORCHESTRATOR,
+            id=agent_ids["orchestrator"],
+        )
 
-    def send_intruction_for_workers(self, agent_id: int, instruction: str):
-        self.message_broker.publish(Message(value=instruction, to_agent_id=agent_id))
+    def stop_the_world(self):
+        response = self.system.ask(
+            self.orchestrator.address,
+            SignalMessage(
+                type=Signal.STOP,
+                from_agent=self._from,
+                to_agent=ActorName.ORCHESTRATOR,
+            ),
+            timeout=STATUS_CHECK_TIMEOUT_SECONDS,
+        )
+        self.logger.info(f"Ochestrator stop response: {response.status.value}")
+
+    def status(self) -> Status:
+        return self.system.ask(
+            self.orchestrator.address,
+            SignalMessage(
+                type=Signal.STATUS,
+                from_agent=self._from,
+                to_agent=ActorName.ORCHESTRATOR,
+            ),
+            timeout=STATUS_CHECK_TIMEOUT_SECONDS,
+        )
+
+    def init(self, config: Config, agent_ids: dict) -> Ack:
+        return self.system.ask(
+            self.orchestrator.address,
+            Init(config=config, agent_ids=agent_ids),
+            timeout=STATUS_CHECK_TIMEOUT_SECONDS,
+        )
+
+    def start(self):
+        return self.system.ask(
+            self.orchestrator.address,
+            SignalMessage(
+                type=Signal.START,
+                from_agent=self._from,
+                to_agent=ActorName.ORCHESTRATOR,
+            ),
+            timeout=STATUS_CHECK_TIMEOUT_SECONDS,
+        )

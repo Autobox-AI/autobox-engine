@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+# Run Docker container with proper configuration
+set -e
+
+# Check if OPENAI_API_KEY is set
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "Error: OPENAI_API_KEY environment variable is not set"
+    echo "Please export OPENAI_API_KEY=<your-api-key>"
+    exit 1
+fi
+
+# Default values
+CONFIG="examples/simulations/summer_vacation.json"
+METRICS="examples/metrics/summer_vacation.json"
+IMAGE_TAG="latest"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --config|-c)
+            CONFIG="$2"
+            shift 2
+            ;;
+        --metrics|-m)
+            METRICS="$2"
+            shift 2
+            ;;
+        --tag|-t)
+            IMAGE_TAG="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  -c, --config FILE   Simulation config file (default: examples/simulations/summer_vacation.json)"
+            echo "  -m, --metrics FILE  Metrics config file (default: examples/metrics/summer_vacation.json)"
+            echo "  -t, --tag TAG       Docker image tag (default: latest)"
+            echo "  -h, --help          Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Get absolute paths
+CONFIG_DIR=$(dirname "$(realpath "$CONFIG")")
+CONFIG_FILE=$(basename "$CONFIG")
+METRICS_DIR=$(dirname "$(realpath "$METRICS")")
+METRICS_FILE=$(basename "$METRICS")
+
+echo "Running autobox-engine container..."
+echo "Config: $CONFIG"
+echo "Metrics: $METRICS"
+
+docker run \
+    --rm \
+    -it \
+    -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+    -v "$CONFIG_DIR:/app/configs/simulations:ro" \
+    -v "$METRICS_DIR:/app/configs/metrics:ro" \
+    -v "$(pwd)/logs:/app/logs" \
+    "autobox-engine:${IMAGE_TAG}" \
+    --config "/app/configs/simulations/$CONFIG_FILE" \
+    --metrics "/app/configs/metrics/$METRICS_FILE"

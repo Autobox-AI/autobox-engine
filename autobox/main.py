@@ -1,9 +1,9 @@
 import asyncio
 
-from autobox.bootstrap.simulator import prepare_simulator
 from autobox.config.cli import parse_args
 from autobox.config.loader import load_metrics_config, load_simulation_config
 from autobox.core.runner import Runner
+from autobox.core.simulator import Simulator
 from autobox.logging.logger import Logger
 from autobox.schemas.config import Config
 
@@ -22,7 +22,9 @@ async def main():
 
     logger.print_banner()
 
-    runner = Runner(simulator=(await prepare_simulator(config)))
+    simulator = Simulator(config=config)
+
+    runner = Runner(simulator=simulator)
 
     await runner.run()
 

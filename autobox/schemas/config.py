@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -66,3 +66,6 @@ class SimulationConfig(BaseModel):
 class Config(BaseModel):
     simulation: SimulationConfig
     metrics: Optional[List[MetricConfig]] = None
+
+    def get_worker_configs_by_name(self) -> Dict[str, WorkerConfig]:
+        return {worker.name: worker for worker in self.simulation.workers}

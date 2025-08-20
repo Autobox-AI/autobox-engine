@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Dict, List
 
@@ -35,3 +36,29 @@ class Memory(BaseModel):
 
     def has_pending(self):
         return len(self.pending) > 0
+
+    def get_history_between_workers(self):
+        return [
+            msg
+            for msg in self.history
+            if (
+                msg.from_agent == "orchestrator"
+                and msg.to_agent != "planner"
+                and msg.to_agent != "reporter"
+                and msg.to_agent != "evaluator"
+            )
+            or (
+                msg.to_agent == "orchestrator"
+                and msg.from_agent != "planner"
+                and msg.from_agent != "reporter"
+                and msg.from_agent != "evaluator"
+            )
+        ]
+
+    def get_history_between_worker_str(self):
+        return json.dumps(
+            [msg.model_dump_json() for msg in self.get_history_between_workers()]
+        )
+
+    def get_history_str(self):
+        return json.dumps([msg.model_dump_json() for msg in self.get_history()])

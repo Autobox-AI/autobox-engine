@@ -1,0 +1,73 @@
+{
+    "name": "Test Simulation",
+    "max_steps": 150,
+    "timeout_seconds": 300,
+    "description": "Test simulation for unit tests",
+    "task": "Test task for simulation",
+    "evaluator": {
+        "name": "EVALUATOR",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "reporter": {
+        "name": "REPORTER",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "planner": {
+        "name": "PLANNER",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "orchestrator": {
+        "name": "ORCHESTRATOR",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "workers": [
+        {
+            "name": "WORKER_1",
+            "description": "Test worker 1",
+            "role": "Test role 1",
+            "backstory": "Test backstory 1",
+            "llm": {
+                "model": "gpt-3.5-turbo"
+            },
+            "mailbox": {
+                "max_size": 100
+            }
+        },
+        {
+            "name": "WORKER_2",
+            "description": "Test worker 2",
+            "role": "Test role 2",
+            "backstory": "Test backstory 2",
+            "llm": {
+                "model": "gpt-3.5-turbo"
+            },
+            "mailbox": {
+                "max_size": 100
+            }
+        }
+    ],
+    "logging": {
+        "verbose": false,
+        "log_path": null
+    }
+}

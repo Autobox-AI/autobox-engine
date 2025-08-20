@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MetricType(str, Enum):
@@ -77,14 +77,13 @@ class SummaryValue(MetricValue):
 
 
 class Metric(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     name: str
     # description: str
     # type: MetricType
     # unit: str
     values: List[CounterValue | GaugeValue | HistogramValue | SummaryValue]
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class MetricCalculatorUpdate(BaseModel):

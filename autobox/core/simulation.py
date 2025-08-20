@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from autobox.logging.logger import Logger
 from autobox.schemas.simulation import SimulationStatus
@@ -20,9 +20,8 @@ class Simulation(BaseModel):
     # metrics: Dict[str, Metric] = Field(default={})
     summary: str = Field(default=None)
     logger: Logger = Logger.get_instance()
-
-    class Config:
-        arbitrary_types_allowed = True
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def update_status(
         self,

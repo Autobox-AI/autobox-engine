@@ -1,127 +1,283 @@
+# import json
+
+
 import json
-from typing import Dict
+import os
 
-from autobox.core.agents.base import BaseAgent
-from autobox.core.simulation import Simulation
-from autobox.schemas.message import Message
+from thespian.actors import Actor, ActorAddress, ActorExitRequest
+
+from autobox.bootstrap.metrics import generate_metrics
+from autobox.core.agents.evaluator import Evaluator
+from autobox.core.agents.planner import Planner
+from autobox.core.agents.reporter import Reporter
+from autobox.core.agents.worker import Worker
+from autobox.logging.logger import Logger
+from autobox.schemas.actor import ActorName, ActorStatus
+from autobox.schemas.memory import Memory
+from autobox.schemas.message import (
+    Ack,
+    Init,
+    InitAgent,
+    InitEvaluator,
+    InitPlanner,
+    InitReporter,
+    Message,
+    Signal,
+    SignalMessage,
+    Status,
+)
 from autobox.schemas.planner import PlannerOutput, PlannerStatus
-from autobox.schemas.simulation import SimulationStatus
+
+# from autobox.core.simulation import Simulation
+# from autobox.schemas.message import Message
+# from autobox.schemas.planner import PlannerOutput, PlannerStatus
+# from autobox.schemas.simulation import SimulationStatus
 
 
-class Orchestrator(BaseAgent):
-    planner_id: str
-    evaluator_id: str
-    reporter_id: str
-    worker_ids_by_name: Dict[str, str] = {}
-    worker_names_by_id: Dict[str, str] = {}
-    # iterations_counter: int = Field(default=0)
-    # max_steps: int = Field(default=5)
-    # instruction: str
-    simulation_id: str = None
-    simulation: Simulation = None
+class Orchestrator(Actor):
+    def __init__(self):
+        super().__init__()
+        self.id: str = None
+        self.name: str = ActorName.ORCHESTRATOR
+        self.planner = None
+        self.evaluator = None
+        self.reporter = None
+        self.workers = {}
+        self.is_completed = False
+        self.memory = Memory()
+        self.status: ActorStatus = ActorStatus.NOT_INITIALIZED
+        self.logger: Logger = Logger.get_instance()
 
-    def handle_task(self, message):
-        """Subclasses must implement how to process a message."""
-        pass
-
-    async def handle_message(self, message: Message):
-        self.memory.add_message(message)
-
-        from_agent_id = message.from_agent_id or self.id
-        self.memory.remove_if_pending(from_agent_id)
-
-        if message.value == "start":
-            self.simulation.update_status(
-                status=SimulationStatus.IN_PROGRESS,
-                progress=0,
-            )
-
-        if from_agent_id == self.reporter_id:
-            all_agent_ids = [self.planner_id, self.evaluator_id, self.reporter_id] + [
-                id for _, id in self.worker_ids_by_name.items()
-            ]
-            self.simulation.update_summary(message.value)
-            for id in all_agent_ids:
+    def receiveMessage(self, message, sender):
+        if isinstance(message, Init):
+            self.handle_init(sender, message)
+        elif isinstance(message, SignalMessage):
+            if message.type == Signal.START:
+                self.status = ActorStatus.RUNNING
+                self.logger.info("Orchestrator starting...")
                 self.send(
-                    Message(
-                        from_agent_id=self.id,
-                        to_agent_id=id,
-                        value="end",
+                    self.planner,
+                    SignalMessage(
+                        from_agent=self.name,
+                        to_agent=ActorName.PLANNER,
+                        type=Signal.PLAN,
+                    ),
+                )
+                self.send(sender, Ack(from_agent=self.name, to_agent="simulator"))
+            elif message.type == Signal.ACKED:
+                self.logger.info(
+                    f"{message.from_agent} acknowledged: {message.content}"
+                )
+            elif message.type == Signal.STATUS:
+                self.send(
+                    sender,
+                    Status(
+                        from_agent=self.name, to_agent="simulator", status=self.status
+                    ),
+                )
+            elif message.type == Signal.STOP:
+                self.send(self.myAddress, ActorExitRequest())
+                self.status = ActorStatus.STOPPED
+                self.logger.info("Orchestrator stopped all agents")
+                self.send(
+                    sender,
+                    Status(
+                        from_agent=self.name, to_agent="simulator", status=self.status
+                    ),
+                )
+            elif message.type == Signal.UNKNOWN:
+                self.logger.info(
+                    f"Orchestrator received unknown message from {message.from_agent}: {message}"
+                )
+        elif isinstance(message, Message):
+            self.memory.add_message(message)
+
+            if message.from_agent == ActorName.PLANNER:
+                planner_output = PlannerOutput.model_validate_json(message.content)
+                self.logger.info(
+                    f"Orchestrator received plan with {len(planner_output.instructions)} instructions: {planner_output.thinking_process}"
+                )
+                for instruction in planner_output.instructions:
+                    self.logger.info(
+                        f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
                     )
+            else:
+                self.logger.info(
+                    f"Orchestrator received message from {message.from_agent}: {message.content}"
                 )
 
-            self.is_end = True
-            return
-
-        if from_agent_id != self.evaluator_id and message.value != "start":
-            self.evaluate()
-
-        if from_agent_id == self.planner_id:
-            planner_output = PlannerOutput.model_validate_json(message.value)
-            self.simulation.update_status(
-                status=planner_output.status,
-                progress=planner_output.progress,
-            )
-            self.logger.info(
-                f"status: {planner_output.status.value} ({planner_output.progress}%)"
-            )
-            if planner_output.status == PlannerStatus.COMPLETED:
-                self.send(
-                    Message(
-                        from_agent_id=self.id,
-                        to_agent_id=self.reporter_id,
-                        value=self.get_memory_history_between_workers(),
-                    )
-                )
+            if message.from_agent == ActorName.REPORTER:
+                self.logger.info("Orchestrator is completing...")
+                self.status = ActorStatus.COMPLETED
                 return
 
-            for instruction in planner_output.instructions:
-                self.send(
-                    Message(
-                        from_agent_id=self.id,
-                        to_agent_id=self.worker_ids_by_name[instruction.agent_name],
-                        value=instruction.instruction,
+            self.memory.remove_if_pending(message.from_agent)
+
+            if message.from_agent == ActorName.PLANNER:
+                planner_output = PlannerOutput.model_validate_json(message.content)
+
+                if planner_output.status == PlannerStatus.COMPLETED:
+                    self.send(
+                        self.reporter,
+                        Message(
+                            from_agent=self.name,
+                            to_agent=ActorName.REPORTER,
+                            content=self.memory.get_history_between_worker_str(),
+                        ),
                     )
+                    self.memory.add_pending("reporter")
+                    return
+                for instruction in planner_output.instructions:
+                    self.send(
+                        self.workers[instruction.agent_name],
+                        Message(
+                            from_agent=self.name,
+                            to_agent=instruction.agent_name,
+                            content=instruction.instruction,
+                        ),
+                    )
+                    self.memory.add_pending(instruction.agent_name)
+            else:
+                if self.memory.has_pending():
+                    return
+                self.send(
+                    self.planner,
+                    Message(
+                        from_agent=self.name,
+                        to_agent=ActorName.PLANNER,
+                        content=self.memory.get_history_str(),
+                    ),
                 )
+        elif isinstance(message, ActorExitRequest):
+            pass
         else:
-            if self.memory.has_pending():
-                return
-
-            self.send(
-                Message(
-                    from_agent_id=self.id,
-                    to_agent_id=self.planner_id,
-                    value=self.get_memory_history_between_workers(),
-                )
+            self.logger.info(
+                f"Orchestrator received unknown message from {sender}: {message}"
             )
 
-    def get_memory_history_between_workers(self):
-        memories_only_from_workers = [
-            {
-                "from": (
-                    self.worker_names_by_id[message.from_agent_id]
-                    if message.from_agent_id in self.worker_names_by_id
-                    else self.name
-                ),
-                "to": (
-                    self.worker_names_by_id[message.to_agent_id]
-                    if message.to_agent_id in self.worker_names_by_id
-                    else self.name
-                ),
-                "value": message.value,
-            }
-            for message in self.memory.get_history()
-            if message.from_agent_id in self.worker_ids_by_name.values()
-            or message.to_agent_id in self.worker_ids_by_name.values()
-        ]
+    def stop_the_world(self):
+        self.logger.info("Orchestrator stopping all agents...")
+        # self.send(
+        #     self.planner,
+        #     SignalMessage(
+        #         from_agent=self.name,
+        #         to_agent=ActorName.PLANNER,
+        #         type=Signal.STOP,
+        #     ),
+        # )
+        # self.send(
+        #     self.evaluator,
+        #     SignalMessage(
+        #         from_agent=self.name,
+        #         to_agent=ActorName.EVALUATOR,
+        #         type=Signal.STOP,
+        #     ),
+        # )
+        # self.send(
+        #     self.reporter,
+        #     SignalMessage(
+        #         from_agent=self.name,
+        #         to_agent=ActorName.REPORTER,
+        #         type=Signal.STOP,
+        #     ),
+        # )
+        # for worker_name, worker_actor in self.workers.items():
+        #     self.send(
+        #         worker_actor,
+        #         SignalMessage(
+        #             from_agent=self.name,
+        #             to_agent=worker_name,
+        #             type=Signal.STOP,
+        #         ),
+        #     )
+        self.send(self.myAddress, ActorExitRequest())
+        self.status = ActorStatus.STOPPED
+        self.logger.info("Orchestrator stopped all agents")
 
-        return json.dumps(memories_only_from_workers)
-
-    def evaluate(self):
-        message = Message(
-            from_agent_id=self.id,
-            to_agent_id=self.evaluator_id,
-            value=self.get_memory_history_between_workers(),
+    def handle_init(self, sender: ActorAddress, message: Init):
+        self.id = message.agent_ids["orchestrator"]
+        workers_info = json.dumps(
+            [
+                {
+                    "name": worker.name,
+                    "backstory": worker.backstory,
+                    "role": worker.role,
+                }
+                for worker in message.config.simulation.workers
+            ]
         )
 
-        self.send(message)
+        if message.config.metrics is None:
+            metrics = generate_metrics(
+                workers=workers_info,
+                orchestrator_name=message.config.simulation.orchestrator.name,
+                orchestrator_instruction=message.config.simulation.orchestrator.instruction,
+                task=message.config.simulation.task,
+            )
+        else:
+            metrics = message.config.metrics
+
+        metrics_definitions = json.dumps(
+            {metric.name: (metric.model_dump()) for metric in metrics}
+        )
+
+        worker_configs_by_name = message.config.get_worker_configs_by_name()
+        self.planner = self.createActor(Planner, globalName="planner")
+        self.evaluator = self.createActor(Evaluator, globalName="evaluator")
+        self.reporter = self.createActor(Reporter, globalName="reporter")
+        self.workers = {
+            worker.name: self.createActor(Worker, globalName=worker.name)
+            for worker in message.config.simulation.workers
+        }
+        workers_info = json.dumps(
+            [
+                {
+                    "name": worker.name,
+                    "backstory": worker.backstory,
+                    "role": worker.role,
+                }
+                for worker in message.config.simulation.workers
+            ]
+        )
+
+        self.send(
+            self.planner,
+            InitPlanner(
+                task=message.config.simulation.task,
+                config=message.config.simulation.planner,
+                id=message.agent_ids["planner"],
+                workers_info=workers_info,
+            ),
+        )
+        self.send(
+            self.evaluator,
+            InitEvaluator(
+                task=message.config.simulation.task,
+                config=message.config.simulation.evaluator,
+                id=message.agent_ids["evaluator"],
+                workers_info=workers_info,
+                metrics_definitions=metrics_definitions,
+            ),
+        )
+        self.send(
+            self.reporter,
+            InitReporter(
+                task=message.config.simulation.task,
+                config=message.config.simulation.reporter,
+                id=message.agent_ids["reporter"],
+                workers_info=workers_info,
+            ),
+        )
+        for worker_name, worker_actor in self.workers.items():
+            self.send(
+                worker_actor,
+                InitAgent(
+                    task=message.config.simulation.task,
+                    config=worker_configs_by_name[worker_name],
+                    id=message.agent_ids[worker_name],
+                ),
+            )
+
+        self.status = ActorStatus.INITIALIZED
+        self.send(sender, Ack(from_agent=self.name, to_agent="simulator"))
+        self.logger.info(f"Orchestrator initialized (pid: {os.getpid()})")

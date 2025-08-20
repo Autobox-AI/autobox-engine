@@ -1,0 +1,51 @@
+services:
+  autobox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: autobox-engine:latest
+    container_name: autobox-engine
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount configuration files
+      - ./examples/simulations:/app/configs/simulations:ro
+      - ./examples/metrics:/app/configs/metrics:ro
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+    command: >
+      --config /app/configs/simulations/summer_vacation.json
+      --metrics /app/configs/metrics/summer_vacation.json
+    networks:
+      - autobox-network
+    restart: "no"
+
+  # Development version with hot reload
+  autobox-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: autobox-engine:dev
+    container_name: autobox-engine-dev
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount entire source code for development
+      - .:/app:rw
+      - ./logs:/app/logs
+    command: >
+      uv run python -m autobox.main
+      --config examples/simulations/summer_vacation.json
+      --metrics examples/metrics/summer_vacation.json
+    networks:
+      - autobox-network
+    profiles:
+      - dev
+
+networks:
+  autobox-network:
+    driver: bridge

@@ -1,13 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from autobox.core.simulator import Simulator
 
 
 class Runner(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     simulator: Simulator
-
-    class Config:
-        arbitrary_types_allowed = True
 
     async def run(self):
         await self.simulator.run()

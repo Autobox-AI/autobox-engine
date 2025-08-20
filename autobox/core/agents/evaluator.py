@@ -1,19 +1,65 @@
-from autobox.core.agents.base import BaseAgent
-from autobox.schemas.message import Message
+import os
+
+from thespian.actors import Actor, ActorExitRequest
+
+from autobox.core.ai.llm import LLM
+from autobox.core.prompts.evaluator import prompt as system_prompt
+from autobox.logging.logger import Logger
+from autobox.schemas.actor import ActorName, ActorStatus
+from autobox.schemas.memory import Memory
+from autobox.schemas.message import Ack, InitEvaluator, Signal, SignalMessage
 
 
-class Evaluator(BaseAgent):
-    orchestrator_id: str
+class Evaluator(Actor):
+    def __init__(self):
+        super().__init__()
+        self.id = None
+        self.llm = None
+        self.memory = Memory()
+        self.logger: Logger = Logger.get_instance()
+        self.name: str = ActorName.EVALUATOR
+        self.status: ActorStatus = None
 
-    def handle_task(self, message):
-        """Subclasses must implement how to process a message."""
-        pass
+    def receiveMessage(self, message, sender):
+        # self.memory.add_message(message)
+        if isinstance(message, InitEvaluator):
+            self.id = message.id
+            self.llm = LLM(
+                system_prompt=system_prompt(
+                    task=message.task,
+                    agents=message.workers_info,
+                    metrics=message.metrics_definitions,
+                ),
+                model=message.config.llm.model,
+            )
+            self.status = ActorStatus.INITIALIZED
+            self.send(
+                sender,
+                Ack(
+                    from_agent=self.name,
+                    to_agent=ActorName.ORCHESTRATOR,
+                    content="initialized",
+                ),
+            )
+            self.logger.info(f"Evaluator initialized (pid: {os.getpid()})")
+        elif isinstance(message, SignalMessage):
+            if message.type == Signal.STOP:
+                self.send(self.myAddress, ActorExitRequest())
+                self.status = ActorStatus.STOPPED
+                self.logger.info("Evaluator stopped")
+        else:
+            self.logger.info(f"Evaluator received unknown message: {message}")
+            self.send(
+                sender,
+                SignalMessage(
+                    from_agent=self.name,
+                    to_agent=ActorName.ORCHESTRATOR,
+                    type=Signal.UNKNOWN,
+                ),
+            )
 
-    async def handle_message(self, message: Message):
-        self.memory.add_message(message)
-
-        if self.finish_if_end(message):
-            return
+        # if self.finish_if_end(message):
+        #     return
 
         # from autobox.cache.manager import Cache
 
@@ -83,10 +129,11 @@ class Evaluator(BaseAgent):
 
         # metrics_update: MetricCalculator = completion.choices[0].message.parsed
 
-        self.send(
-            Message(
-                from_agent_id=self.id,
-                to_agent_id=self.orchestrator_id,
-                value="done",
-            )
-        )
+        # self.send(
+        #     Message(
+        #         from_agent_id=self.id,
+        #         to_agent_id=self.orchestrator_id,
+        #         value="done",
+        #     )
+        # )
+        # )

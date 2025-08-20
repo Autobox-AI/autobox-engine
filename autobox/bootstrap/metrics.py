@@ -6,7 +6,7 @@ from autobox.core.prompts.metrics_definition import prompt
 from autobox.schemas.config import GeneratedMetrics
 
 
-def generate(
+def generate_metrics(
     workers: str,
     task: str,
     orchestrator_name: str,

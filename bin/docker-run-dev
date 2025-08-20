@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# Run Docker development container
+set -e
+
+# Check if OPENAI_API_KEY is set
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "Error: OPENAI_API_KEY environment variable is not set"
+    echo "Please export OPENAI_API_KEY=<your-api-key>"
+    exit 1
+fi
+
+# Default values
+CONFIG="examples/simulations/summer_vacation.json"
+METRICS="examples/metrics/summer_vacation.json"
+INTERACTIVE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --config|-c)
+            CONFIG="$2"
+            shift 2
+            ;;
+        --metrics|-m)
+            METRICS="$2"
+            shift 2
+            ;;
+        --interactive|-i)
+            INTERACTIVE=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Run the development Docker container with source code mounted"
+            echo ""
+            echo "Options:"
+            echo "  -c, --config FILE    Simulation config file (default: examples/simulations/summer_vacation.json)"
+            echo "  -m, --metrics FILE   Metrics config file (default: examples/metrics/summer_vacation.json)"
+            echo "  -i, --interactive    Start interactive shell instead of running simulation"
+            echo "  -h, --help           Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                           # Run simulation with defaults"
+            echo "  $0 -i                        # Start interactive shell"
+            echo "  $0 -c path/to/config.json   # Run with custom config"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Running autobox-engine dev container..."
+
+if [ "$INTERACTIVE" = true ]; then
+    echo "Starting interactive shell..."
+    docker run \
+        --rm \
+        -it \
+        -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+        -e OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE \
+        -v "$(pwd):/app" \
+        -w /app \
+        "autobox-engine:dev-latest" \
+        /bin/bash
+else
+    echo "Config: $CONFIG"
+    echo "Metrics: $METRICS"
+    
+    docker run \
+        --rm \
+        -it \
+        -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+        -e OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE \
+        -v "$(pwd):/app" \
+        -w /app \
+        "autobox-engine:dev-latest" \
+        uv run python -m autobox.main \
+        --config "$CONFIG" \
+        --metrics "$METRICS"
+fi
