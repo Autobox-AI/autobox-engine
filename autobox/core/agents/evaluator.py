@@ -21,7 +21,7 @@ class Evaluator(Actor):
         self.status: ActorStatus = None
 
     def receiveMessage(self, message, sender):
-        # self.memory.add_message(message)
+        self.memory.add_message(message)
         if isinstance(message, InitEvaluator):
             self.id = message.id
             self.llm = LLM(

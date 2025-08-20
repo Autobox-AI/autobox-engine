@@ -92,20 +92,6 @@ class Orchestrator(Actor):
         elif isinstance(message, Message):
             self.memory.add_message(message)
 
-            if message.from_agent == ActorName.PLANNER:
-                planner_output = PlannerOutput.model_validate_json(message.content)
-                self.logger.info(
-                    f"Orchestrator received plan with {len(planner_output.instructions)} instructions: {planner_output.thinking_process}"
-                )
-                for instruction in planner_output.instructions:
-                    self.logger.info(
-                        f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
-                    )
-            else:
-                self.logger.info(
-                    f"Orchestrator received message from {message.from_agent}: {message.content}"
-                )
-
             if message.from_agent == ActorName.REPORTER:
                 self.logger.info("Orchestrator is completing...")
                 self.status = ActorStatus.COMPLETED
@@ -115,6 +101,13 @@ class Orchestrator(Actor):
 
             if message.from_agent == ActorName.PLANNER:
                 planner_output = PlannerOutput.model_validate_json(message.content)
+                self.logger.info(
+                    f"Orchestrator received plan with {len(planner_output.instructions)} instructions: {planner_output.thinking_process}"
+                )
+                for instruction in planner_output.instructions:
+                    self.logger.info(
+                        f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
+                    )
 
                 if planner_output.status == PlannerStatus.COMPLETED:
                     self.send(
@@ -138,6 +131,9 @@ class Orchestrator(Actor):
                     )
                     self.memory.add_pending(instruction.agent_name)
             else:
+                self.logger.info(
+                    f"Orchestrator received message from {message.from_agent}: {message.content}"
+                )
                 if self.memory.has_pending():
                     return
                 self.send(
@@ -157,39 +153,6 @@ class Orchestrator(Actor):
 
     def stop_the_world(self):
         self.logger.info("Orchestrator stopping all agents...")
-        # self.send(
-        #     self.planner,
-        #     SignalMessage(
-        #         from_agent=self.name,
-        #         to_agent=ActorName.PLANNER,
-        #         type=Signal.STOP,
-        #     ),
-        # )
-        # self.send(
-        #     self.evaluator,
-        #     SignalMessage(
-        #         from_agent=self.name,
-        #         to_agent=ActorName.EVALUATOR,
-        #         type=Signal.STOP,
-        #     ),
-        # )
-        # self.send(
-        #     self.reporter,
-        #     SignalMessage(
-        #         from_agent=self.name,
-        #         to_agent=ActorName.REPORTER,
-        #         type=Signal.STOP,
-        #     ),
-        # )
-        # for worker_name, worker_actor in self.workers.items():
-        #     self.send(
-        #         worker_actor,
-        #         SignalMessage(
-        #             from_agent=self.name,
-        #             to_agent=worker_name,
-        #             type=Signal.STOP,
-        #         ),
-        #     )
         self.send(self.myAddress, ActorExitRequest())
         self.status = ActorStatus.STOPPED
         self.logger.info("Orchestrator stopped all agents")

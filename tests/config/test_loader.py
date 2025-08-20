@@ -3,7 +3,7 @@
 
 import pytest
 
-from autobox.config.loader import load_simulation_config
+from autobox.config.loader import _load_simulation_config as load_simulation_config
 
 
 def test_loader():

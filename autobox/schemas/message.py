@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Dict, Optional
 
 from openai import BaseModel
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from autobox.schemas.actor import ActorStatus
 from autobox.schemas.config import AgentConfig, Config
@@ -21,22 +21,6 @@ class Signal(str, Enum):
     ACKED = "acked"
 
 
-# class MessageType(str, Enum):
-#     INIT = "init"
-#     START = "start"
-#     STOP = "stop"
-#     STATUS = "status"
-#     ABORT = "abort"
-#     COMPLETED = "completed"
-#     RUNNING = "running"
-#     PLAN = "plan"
-#     INITIALIZED = "initialized"
-#     UNKNOWN = "unknown"
-#     ERROR = "error"
-#     STOPPED = "stopped"
-#     ACKED = "acked"
-
-
 class SignalMessage(BaseModel):
     type: Signal = Field(default=None)
     from_agent: str = Field(default=None)
@@ -46,6 +30,11 @@ class SignalMessage(BaseModel):
 
 class Ack(SignalMessage):
     type: Signal = Signal.ACKED
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.ACKED
 
 
 class Message(BaseModel):
@@ -57,6 +46,11 @@ class Message(BaseModel):
 class Status(SignalMessage):
     type: Signal = Signal.STATUS
     status: ActorStatus
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.STATUS
 
 
 class Init(BaseModel):
