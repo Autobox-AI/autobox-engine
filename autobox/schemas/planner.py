@@ -17,7 +17,7 @@ class PlannerOutput(BaseModel):
     status: SimulationStatus = Field(
         description="The status of the simulation: started, in progress, completed, failed, aborted, timeout"
     )
-    progress: float = Field(description="The progress of the task. <= 100.")
+    progress: int = Field(description="The progress of the task. <= 100.")
     instructions: List[Instruction] = Field(
         description="A list of instructions for each AI agent. Set to empty array if status is completed."
     )

@@ -69,6 +69,7 @@ class ServerConfig(BaseModel):
     port: int
     reload: bool
     logging: LoggingConfig
+    exit_on_completion: bool = False
 
 
 class Config(BaseModel):

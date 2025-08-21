@@ -12,8 +12,12 @@ from autobox.schemas.config import ServerConfig
 from autobox.server import create_app
 
 
-async def run_server(config: ServerConfig, actor_manager: ActorManager):
-    """Run the FastAPI server asynchronously."""
+async def run_server(
+    config: ServerConfig,
+    actor_manager: ActorManager,
+    shutdown_event: asyncio.Event = None,
+):
+    """Run the FastAPI server asynchronously with graceful shutdown support."""
 
     server_logger = LoggerManager.get_server_logger(
         verbose=config.logging.verbose,
@@ -32,7 +36,32 @@ async def run_server(config: ServerConfig, actor_manager: ActorManager):
         log_level="warning",
     )
     server = uvicorn.Server(uvicorn_config)
-    await server.serve()
+
+    if shutdown_event:
+
+        async def serve_with_shutdown():
+            serve_task = asyncio.create_task(server.serve())
+            shutdown_task = asyncio.create_task(shutdown_event.wait())
+
+            done, pending = await asyncio.wait(
+                {serve_task, shutdown_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+
+            if shutdown_task in done:
+                server.should_exit = True
+                if serve_task in pending:
+                    await serve_task
+
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        await serve_with_shutdown()
+    else:
+        await server.serve()
 
 
 async def main():
@@ -71,23 +100,39 @@ async def main():
 
     runner = Runner(simulator=simulator)
 
+    shutdown_event = asyncio.Event()
+
     server_task = asyncio.create_task(
-        run_server(config.server, simulator.actor_manager)
+        run_server(config.server, simulator.actor_manager, shutdown_event)
     )
     runner_task = asyncio.create_task(runner.run())
 
     try:
         await runner_task
         runner_logger.info("Simulation completed.")
-        app_logger.info("Server still running. Press Ctrl+C to stop.")
-        await server_task
+
+        if config.server.exit_on_completion:
+            app_logger.info("✅ Simulation finished. Shutting down server...")
+            shutdown_event.set()
+            await server_task
+        else:
+            app_logger.info(
+                "✅ Simulation finished. Server still running. Press Ctrl+C to stop."
+            )
+            await server_task
+
     except KeyboardInterrupt:
         app_logger.info("Shutting down...")
-        server_task.cancel()
+        shutdown_event.set()
         try:
-            await server_task
-        except asyncio.CancelledError:
-            pass
+            await asyncio.wait_for(server_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            app_logger.warning("Server shutdown timeout, forcing termination")
+            server_task.cancel()
+            try:
+                await server_task
+            except asyncio.CancelledError:
+                pass
 
 
 if __name__ == "__main__":
