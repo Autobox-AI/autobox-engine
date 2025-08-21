@@ -31,7 +31,6 @@ from autobox.schemas.planner import PlannerOutput, PlannerStatus
 class Orchestrator(BaseAgent):
     def __init__(self):
         super().__init__()
-
         self.planner = None
         self.evaluator = None
         self.reporter = None
