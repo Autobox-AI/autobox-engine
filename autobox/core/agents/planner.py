@@ -1,24 +1,18 @@
 import os
 
-from thespian.actors import Actor, ActorAddress, ActorExitRequest
+from thespian.actors import ActorAddress, ActorExitRequest
 
+from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.planner import prompt as system_prompt
-from autobox.logging.logger import Logger
 from autobox.schemas.actor import ActorName, ActorStatus
-from autobox.schemas.memory import Memory
 from autobox.schemas.message import Ack, InitPlanner, Message, Signal, SignalMessage
 from autobox.schemas.planner import PlannerOutput
 
 
-class Planner(Actor):
+class Planner(BaseAgent):
     def __init__(self):
         super().__init__()
-        self.memory = Memory()
-        self.logger: Logger = Logger.get_instance()
-        self.id: str = None
-        self.llm: LLM = None
-        self.status: ActorStatus = None
         self.name: str = ActorName.PLANNER
 
     def receiveMessage(self, message, sender):

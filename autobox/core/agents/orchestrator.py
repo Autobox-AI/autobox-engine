@@ -4,16 +4,15 @@
 import json
 import os
 
-from thespian.actors import Actor, ActorAddress, ActorExitRequest
+from thespian.actors import ActorAddress, ActorExitRequest
 
 from autobox.bootstrap.metrics import generate_metrics
+from autobox.core.agents.base import BaseAgent
 from autobox.core.agents.evaluator import Evaluator
 from autobox.core.agents.planner import Planner
 from autobox.core.agents.reporter import Reporter
 from autobox.core.agents.worker import Worker
-from autobox.logging.logger import Logger
 from autobox.schemas.actor import ActorName, ActorStatus
-from autobox.schemas.memory import Memory
 from autobox.schemas.message import (
     Ack,
     Init,
@@ -28,25 +27,17 @@ from autobox.schemas.message import (
 )
 from autobox.schemas.planner import PlannerOutput, PlannerStatus
 
-# from autobox.core.simulation import Simulation
-# from autobox.schemas.message import Message
-# from autobox.schemas.planner import PlannerOutput, PlannerStatus
-# from autobox.schemas.simulation import SimulationStatus
 
-
-class Orchestrator(Actor):
+class Orchestrator(BaseAgent):
     def __init__(self):
         super().__init__()
-        self.id: str = None
-        self.name: str = ActorName.ORCHESTRATOR
+
         self.planner = None
         self.evaluator = None
         self.reporter = None
         self.workers = {}
         self.is_completed = False
-        self.memory = Memory()
-        self.status: ActorStatus = ActorStatus.NOT_INITIALIZED
-        self.logger: Logger = Logger.get_instance()
+        self.name: str = ActorName.ORCHESTRATOR
 
     def receiveMessage(self, message, sender):
         if isinstance(message, Init):

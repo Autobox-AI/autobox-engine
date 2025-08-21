@@ -1,14 +1,14 @@
 """Test suite for the Worker agent."""
 
+from unittest.mock import ANY, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch, ANY
-from thespian.actors import ActorExitRequest
 
 from autobox.core.agents.worker import Worker
-from autobox.schemas.message import SignalMessage, Signal, Message, Ack, InitAgent
-from autobox.schemas.actor import ActorStatus, ActorName
-from autobox.schemas.config import WorkerConfig, LLMConfig
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.ai import OpenAIModel
+from autobox.schemas.config import LLMConfig, WorkerConfig
+from autobox.schemas.message import Ack, InitAgent, Message, Signal, SignalMessage
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestWorkerInitialization:
         assert worker.role is None
         assert worker.id is None
         assert worker.llm is None
-        assert worker.status is None
+        assert worker.status is ActorStatus.NOT_INITIALIZED
 
 
 class TestWorkerMessageHandling:
@@ -56,18 +56,16 @@ class TestWorkerMessageHandling:
         """Test handling InitAgent message."""
         mock_llm = Mock()
         mock_llm_class.return_value = mock_llm
-        
+
         sender = Mock()
         worker.send = Mock()
-        
+
         init_msg = InitAgent(
-            task="Test task",
-            config=mock_worker_config,
-            id="worker-123"
+            task="Test task", config=mock_worker_config, id="worker-123"
         )
-        
+
         worker.receiveMessage(init_msg, sender)
-        
+
         # Verify worker state is updated
         assert worker.name == "TEST_WORKER"
         assert worker.description == "A test worker"
@@ -76,11 +74,11 @@ class TestWorkerMessageHandling:
         assert worker.role == "Test role"
         assert worker.id == "worker-123"
         assert worker.status == ActorStatus.INITIALIZED
-        
+
         # Verify LLM is created
         mock_llm_class.assert_called_once()
         assert worker.llm == mock_llm
-        
+
         # Verify acknowledgment is sent
         worker.send.assert_called_once()
         ack_msg = worker.send.call_args[0][1]
@@ -94,21 +92,16 @@ class TestWorkerMessageHandling:
         worker.send = Mock()
         # Mock myAddress as a property
         type(worker).myAddress = Mock()
-        
+
         sender = Mock()
         stop_msg = SignalMessage(
-            type=Signal.STOP,
-            from_agent="orchestrator",
-            to_agent="TEST_WORKER"
+            type=Signal.STOP, from_agent="orchestrator", to_agent="TEST_WORKER"
         )
-        
+
         worker.receiveMessage(stop_msg, sender)
-        
+
         # Verify ActorExitRequest is sent to self
-        worker.send.assert_called_once_with(
-            worker.myAddress,
-            ANY
-        )
+        worker.send.assert_called_once_with(worker.myAddress, ANY)
         assert worker.status == ActorStatus.STOPPED
 
     @patch("autobox.core.agents.worker.LLM")
@@ -121,30 +114,28 @@ class TestWorkerMessageHandling:
         mock_completion.choices = [Mock()]
         mock_completion.choices[0].message.content = "Worker response"
         mock_llm.think.return_value = mock_completion
-        
+
         sender = Mock()
         worker.send = Mock()
-        
+
         init_msg = InitAgent(
-            task="Test task",
-            config=mock_worker_config,
-            id="worker-123"
+            task="Test task", config=mock_worker_config, id="worker-123"
         )
         worker.receiveMessage(init_msg, sender)
-        
+
         # Now send a regular message
         msg = Message(
             content="Please do something",
             from_agent="orchestrator",
-            to_agent="TEST_WORKER"
+            to_agent="TEST_WORKER",
         )
-        
+
         worker.receiveMessage(msg, sender)
-        
+
         # Verify message is added to memory
         assert len(worker.memory.history) == 1
         assert worker.memory.history[0] == msg
-        
+
         # Verify LLM is called
         mock_llm.think.assert_called_once()
         chat_messages = mock_llm.think.call_args[0][0]
@@ -152,7 +143,7 @@ class TestWorkerMessageHandling:
         assert "PREVIOUS MESSAGES" in chat_messages[0]["content"]
         assert "INSTRUCTION FOR THIS ITERATION" in chat_messages[1]["content"]
         assert "Please do something" in chat_messages[1]["content"]
-        
+
         # Verify response is sent
         assert worker.send.call_count == 2  # One for init ack, one for message response
         response_msg = worker.send.call_args[0][1]
@@ -165,12 +156,12 @@ class TestWorkerMessageHandling:
         """Test handling unknown message type."""
         worker.name = "TEST_WORKER"
         worker.send = Mock()
-        
+
         sender = Mock()
         unknown_msg = "This is not a valid message type"
-        
+
         worker.receiveMessage(unknown_msg, sender)
-        
+
         # Verify unknown signal is sent
         worker.send.assert_called_once()
         response = worker.send.call_args[0][1]
@@ -192,27 +183,37 @@ class TestWorkerMemory:
         mock_completion.choices = [Mock()]
         mock_completion.choices[0].message.content = "Response"
         mock_llm.think.return_value = mock_completion
-        
+
         sender = Mock()
         worker.send = Mock()
-        
+
         init_msg = InitAgent(
-            task="Test task",
-            config=mock_worker_config,
-            id="worker-123"
+            task="Test task", config=mock_worker_config, id="worker-123"
         )
         worker.receiveMessage(init_msg, sender)
-        
+
         # Send multiple messages
         messages = [
-            Message(content="First message", from_agent="orchestrator", to_agent="TEST_WORKER"),
-            Message(content="Second message", from_agent="orchestrator", to_agent="TEST_WORKER"),
-            Message(content="Third message", from_agent="orchestrator", to_agent="TEST_WORKER"),
+            Message(
+                content="First message",
+                from_agent="orchestrator",
+                to_agent="TEST_WORKER",
+            ),
+            Message(
+                content="Second message",
+                from_agent="orchestrator",
+                to_agent="TEST_WORKER",
+            ),
+            Message(
+                content="Third message",
+                from_agent="orchestrator",
+                to_agent="TEST_WORKER",
+            ),
         ]
-        
+
         for msg in messages:
             worker.receiveMessage(msg, sender)
-        
+
         # Verify all messages are in memory
         assert len(worker.memory.history) == 3
         for i, msg in enumerate(messages):
@@ -228,24 +229,28 @@ class TestWorkerMemory:
         mock_completion.choices = [Mock()]
         mock_completion.choices[0].message.content = "Response"
         mock_llm.think.return_value = mock_completion
-        
+
         sender = Mock()
         worker.send = Mock()
-        
+
         init_msg = InitAgent(
-            task="Test task",
-            config=mock_worker_config,
-            id="worker-123"
+            task="Test task", config=mock_worker_config, id="worker-123"
         )
         worker.receiveMessage(init_msg, sender)
-        
+
         # Add some history
-        worker.memory.add_message(Message(content="Previous message", from_agent="other", to_agent="TEST_WORKER"))
-        
+        worker.memory.add_message(
+            Message(
+                content="Previous message", from_agent="other", to_agent="TEST_WORKER"
+            )
+        )
+
         # Send a new message
-        msg = Message(content="New message", from_agent="orchestrator", to_agent="TEST_WORKER")
+        msg = Message(
+            content="New message", from_agent="orchestrator", to_agent="TEST_WORKER"
+        )
         worker.receiveMessage(msg, sender)
-        
+
         # Verify LLM receives history
         chat_messages = mock_llm.think.call_args[0][0]
         assert "Previous message" in str(chat_messages[0]["content"])

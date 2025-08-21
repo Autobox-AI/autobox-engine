@@ -1,24 +1,18 @@
 import os
 
-from thespian.actors import Actor, ActorExitRequest
+from thespian.actors import ActorExitRequest
 
+from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.reporter import prompt as system_prompt
-from autobox.logging.logger import Logger
 from autobox.schemas.actor import ActorName, ActorStatus
-from autobox.schemas.memory import Memory
 from autobox.schemas.message import Ack, InitReporter, Message, Signal, SignalMessage
 
 
-class Reporter(Actor):
+class Reporter(BaseAgent):
     def __init__(self):
         super().__init__()
-        self.id = None
-        self.llm = None
-        self.memory = Memory()
-        self.logger: Logger = Logger.get_instance()
         self.name: str = ActorName.REPORTER
-        self.status: ActorStatus = None
 
     def receiveMessage(self, message, sender):
         if isinstance(message, InitReporter):
