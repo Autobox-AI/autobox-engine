@@ -68,6 +68,7 @@
     ],
     "logging": {
         "verbose": false,
-        "log_path": null
+        "log_path": "/Users/martin.dagostino/workspace/margostino/autobox/autobox-engine/logs",
+        "log_file": "summer_vacation.log"
     }
 }

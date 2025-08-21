@@ -5,9 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.116.1",
     "openai>=1.99.9",
     "requests>=2.32.4",
     "thespian>=4.0.1",
+    "uvicorn>=0.35.0",
 ]
 
 [project.scripts]

@@ -1,13 +1,14 @@
 import argparse
 import json
 
-from autobox.schemas.config import Config, MetricConfig, SimulationConfig
+from autobox.schemas.config import Config, MetricConfig, ServerConfig, SimulationConfig
 
 
 def load_config(args: argparse.Namespace) -> Config:
     return Config(
         simulation=_load_simulation_config(args.config),
         metrics=_load_metrics_config(args.metrics),
+        server=_load_server_config(args.server),
     )
 
 
@@ -17,6 +18,10 @@ def _load_simulation_config(file_path: str) -> SimulationConfig:
 
 def _load_metrics_config(file_path: str) -> list[MetricConfig]:
     return _load_file(file_path)
+
+
+def _load_server_config(file_path: str) -> ServerConfig:
+    return ServerConfig(**_load_file(file_path))
 
 
 def _load_file(file_path: str) -> dict:

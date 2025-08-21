@@ -1,0 +1,10 @@
+{
+    "host": "localhost",
+    "port": 5000,
+    "reload": true,
+    "logging": {
+        "verbose": false,
+        "log_path": "/Users/martin.dagostino/workspace/margostino/autobox/autobox-engine/logs",
+        "log_file": "server.log"
+    }
+}

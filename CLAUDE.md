@@ -52,6 +52,13 @@ uv run pytest tests/ -k "loader"
 
 ## Architecture & Key Concepts
 
+### Integrated FastAPI Server
+The system now includes an integrated FastAPI server that runs alongside the simulation:
+- **Process Isolation**: Server runs in main process, actors in separate processes
+- **Direct Communication**: Server uses actor system reference to query orchestrator
+- **Background Status Updates**: Cache refreshed every second from orchestrator
+- **Non-blocking API**: All endpoints return instantly from cache
+
 ### Actor System Architecture
 The system uses Thespian actors with a hierarchical structure:
 
@@ -123,13 +130,41 @@ Simulator → Orchestrator → Planner (gets plan)
 - Test fixtures in `tests/fixtures/` (not `examples/`)
 - Production configs in `examples/simulations/` and `examples/metrics/`
 
+## API Endpoints
+
+The integrated FastAPI server provides these endpoints:
+
+```bash
+GET  /ping                    # Test actor connectivity (direct ask to orchestrator)
+GET  /status                  # Get simulation status from cache (instant)
+GET  /status/details          # Get detailed cache info with metadata
+GET  /health                  # Server health with actor and cache status
+GET  /stream                  # SSE stream for real-time updates
+GET  /simulations             # List all simulations (from cache)
+GET  /simulations/{id}        # Get specific simulation status
+```
+
+## Multi-Logger System
+
+The system uses `LoggerManager` for separate logging streams:
+- **app**: Application startup, banner, general messages
+- **server**: HTTP server logs  
+- **runner**: Simulation and actor logs
+
+Each logger can output to:
+- Console only
+- File only  
+- Both console and file
+
 ## Important Patterns to Follow
 
 1. **Pydantic Models**: Use `ConfigDict` instead of class Config (Pydantic v2)
 2. **Actor Messages**: Always include from_agent and to_agent fields
 3. **Error Handling**: Actors should handle exceptions and report via ERROR signal
-4. **Logging**: Use centralized Logger.get_instance() singleton
+4. **Logging**: Use `LoggerManager.get_<name>_logger()` for component-specific logging
 5. **Testing**: Test configs go in `tests/fixtures/`, not `examples/`
+6. **Actor Communication**: Server communicates with actors via `actor_system.ask()`
+7. **Status Caching**: Background task updates cache, endpoints read from cache
 
 ## Docker Development Tips
 
