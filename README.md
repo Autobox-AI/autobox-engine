@@ -39,6 +39,16 @@ cp .env.example .env
 # OPENAI_API_KEY=your-openai-api-key-here
 ```
 
+## Features
+
+- **Multi-Agent Orchestration**: Coordinate complex simulations with multiple AI agents
+- **Actor-Based Architecture**: Built on Thespian actor system for robust process isolation
+- **Integrated FastAPI Server**: Real-time monitoring and control via REST API
+- **Flexible Logging**: Component-specific loggers with console/file output options
+- **Status Caching**: Non-blocking API with background status updates
+- **Docker Support**: Development and production containerization
+- **Comprehensive Testing**: Unit, integration, and end-to-end test suites
+
 ## Running the Application
 
 ### Using UV Scripts
@@ -116,6 +126,68 @@ docker-compose down
 # Remove and prune unused Docker resources
 ./bin/docker-clean -p
 ```
+
+## API Endpoints
+
+The integrated FastAPI server provides real-time monitoring and control:
+
+### Status & Monitoring
+```bash
+# Check server connectivity (tests actor communication)
+curl http://localhost:5000/ping
+
+# Get simulation status (from cache, instant response)
+curl http://localhost:5000/status
+
+# Get detailed cache information
+curl http://localhost:5000/status/details
+
+# Server health check
+curl http://localhost:5000/health
+```
+
+### Simulation Management
+```bash
+# List all simulations
+curl http://localhost:5000/simulations
+
+# Get specific simulation by ID
+curl http://localhost:5000/simulations/{simulation_id}
+
+# Stream real-time updates (Server-Sent Events)
+curl -N http://localhost:5000/stream
+```
+
+### Example: Monitor Running Simulation
+```bash
+# 1. Start simulation - note the SIMULATION ID in logs
+./bin/run
+
+# 2. In another terminal, check status
+SIMULATION_ID=4dff2857-4e08-49c6-b087-49c6e6a8c88f
+curl http://localhost:5000/status
+
+# 3. Watch progress in real-time
+while true; do 
+  curl -s http://localhost:5000/status | jq '.progress'
+  sleep 1
+done
+```
+
+## Logging System
+
+The engine uses a multi-logger system for better observability:
+
+### Logger Types
+- **app**: Application startup, banner, general messages
+- **server**: HTTP server and API logs
+- **runner**: Simulation and actor system logs
+
+### Configuration
+Loggers can output to console, file, or both. Log files are created in the configured `log_path`:
+- `autobox_app.log` - Application events
+- `autobox_server.log` - Server requests and responses  
+- `autobox_runner.log` - Simulation execution details
 
 ## Development
 

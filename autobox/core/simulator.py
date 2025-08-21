@@ -3,11 +3,11 @@ import time
 
 from thespian.actors import ActorSystem
 
-from autobox.actor.manager import create_actor
+from autobox.actor.manager import ActorManager, create_actor
 from autobox.bootstrap.id import create_ids
 from autobox.core.agents.orchestrator import Orchestrator
 from autobox.exception.simulation import StopSimulationException
-from autobox.logging.logger import Logger
+from autobox.logging.logger import LoggerManager
 from autobox.schemas.actor import Actor, ActorName, ActorStatus
 from autobox.schemas.config import Config
 from autobox.schemas.message import Ack, Init, Signal, SignalMessage, Status
@@ -21,11 +21,12 @@ class Simulator:
     def __init__(self, config: Config):
         self.config = config
         self.system = ActorSystem("multiprocQueueBase")
-        self.logger: Logger = Logger.get_instance()
+        self.logger = LoggerManager.get_runner_logger()
         self.orchestrator: Actor = None
         self._from: str = "simulator"
         self.agent_ids = create_ids(self.config.simulation.workers)
         self.orchestrator = self.create_orchestrator(self.agent_ids)
+        self.actor_manager = self.create_actor_manager(self.agent_ids)
 
     async def run(self):
         timeout = self.config.simulation.timeout_seconds
@@ -148,6 +149,9 @@ class Simulator:
             return True, None, consecutive_errors
 
         return False, response.status, 0
+
+    def create_actor_manager(self, agent_ids: dict):
+        return ActorManager(id=agent_ids["orchestrator"])
 
     def create_orchestrator(self, agent_ids: dict):
         return create_actor(

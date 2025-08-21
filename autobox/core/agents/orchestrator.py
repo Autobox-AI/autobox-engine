@@ -23,9 +23,12 @@ from autobox.schemas.message import (
     Message,
     Signal,
     SignalMessage,
+    SimulationMessage,
+    SimulationSignal,
     Status,
 )
-from autobox.schemas.planner import PlannerOutput, PlannerStatus
+from autobox.schemas.planner import PlannerOutput
+from autobox.schemas.simulation import SimulationStatus
 
 
 class Orchestrator(BaseAgent):
@@ -36,15 +39,27 @@ class Orchestrator(BaseAgent):
         self.reporter = None
         self.workers = {}
         self.is_completed = False
+        self.simulation_progress = 0
+        self.simulation_status: SimulationStatus = None
         self.name: str = ActorName.ORCHESTRATOR
 
     def receiveMessage(self, message, sender):
         if isinstance(message, Init):
             self.handle_init(sender, message)
+        elif isinstance(message, SimulationSignal):
+            self.send(
+                sender,
+                SimulationMessage(
+                    status=self.simulation_status,
+                    progress=self.simulation_progress,
+                ),
+            )
         elif isinstance(message, SignalMessage):
             if message.type == Signal.START:
                 self.status = ActorStatus.RUNNING
+                self.simulation_status = SimulationStatus.IN_PROGRESS
                 self.logger.info("Orchestrator starting...")
+
                 self.send(
                     self.planner,
                     SignalMessage(
@@ -94,12 +109,15 @@ class Orchestrator(BaseAgent):
                 self.logger.info(
                     f"Orchestrator received plan with {len(planner_output.instructions)} instructions: {planner_output.thinking_process}"
                 )
+                self.simulation_progress = planner_output.progress
+                self.simulation_status = planner_output.status
+
                 for instruction in planner_output.instructions:
                     self.logger.info(
                         f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
                     )
 
-                if planner_output.status == PlannerStatus.COMPLETED:
+                if planner_output.status == SimulationStatus.COMPLETED:
                     self.send(
                         self.reporter,
                         Message(
@@ -124,8 +142,10 @@ class Orchestrator(BaseAgent):
                 self.logger.info(
                     f"Orchestrator received message from {message.from_agent}: {message.content}"
                 )
+
                 if self.memory.has_pending():
                     return
+
                 self.send(
                     self.planner,
                     Message(
@@ -149,6 +169,16 @@ class Orchestrator(BaseAgent):
 
     def handle_init(self, sender: ActorAddress, message: Init):
         self.id = message.agent_ids["orchestrator"]
+        self.simulation_id = self.id  # Set simulation ID for publisher
+        self.simulation_status = SimulationStatus.NEW
+
+        # Log simulation ID for easy access
+        self.logger.info("=" * 60)
+        self.logger.info(f"SIMULATION ID: {self.simulation_id}")
+        self.logger.info("=" * 60)
+        self.logger.info("Use this ID to check status:")
+        self.logger.info("  curl http://localhost:5000/status")
+        self.logger.info("=" * 60)
         workers_info = json.dumps(
             [
                 {

@@ -3,6 +3,8 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
+from autobox.schemas.simulation import SimulationStatus
+
 
 class PlannerStatus(str, Enum):
     IN_PROGRESS = "in progress"
@@ -18,8 +20,8 @@ class PlannerOutput(BaseModel):
     thinking_process: str = Field(
         description="Think step by step and explain your decision process. <= 30 words."
     )
-    status: PlannerStatus = Field(
-        description="Whether the task is completed or in progress."
+    status: SimulationStatus = Field(
+        description="The status of the simulation: started, in progress, completed, failed, aborted, timeout"
     )
     progress: float = Field(description="The progress of the task. <= 100.")
     instructions: List[Instruction] = Field(

@@ -9,6 +9,7 @@ from autobox.schemas.metrics import MetricType
 class LoggingConfig(BaseModel):
     verbose: bool = False
     log_path: Optional[str] = None
+    log_file: Optional[str] = None
 
 
 class MailboxConfig(BaseModel):
@@ -63,9 +64,17 @@ class SimulationConfig(BaseModel):
     logging: LoggingConfig
 
 
+class ServerConfig(BaseModel):
+    host: str
+    port: int
+    reload: bool
+    logging: LoggingConfig
+
+
 class Config(BaseModel):
     simulation: SimulationConfig
     metrics: Optional[List[MetricConfig]] = None
+    server: Optional[ServerConfig] = None
 
     def get_worker_configs_by_name(self) -> Dict[str, WorkerConfig]:
         return {worker.name: worker for worker in self.simulation.workers}

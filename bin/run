@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE
-uv run python -m autobox.main --config examples/simulations/summer_vacation.json --metrics examples/metrics/summer_vacation.json "$@"
+uv run python -m autobox.main --config examples/simulations/summer_vacation.json --metrics examples/metrics/summer_vacation.json --server examples/server/default.json "$@"

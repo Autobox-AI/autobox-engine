@@ -4,8 +4,9 @@ from typing import Dict, Optional
 from openai import BaseModel
 from pydantic import Field, field_validator
 
-from autobox.schemas.actor import ActorStatus
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import AgentConfig, Config
+from autobox.schemas.simulation import SimulationStatus
 
 
 class Signal(str, Enum):
@@ -19,6 +20,7 @@ class Signal(str, Enum):
     UNKNOWN = "unknown"
     ERROR = "error"
     ACKED = "acked"
+    SIMULATION = "simulation"
 
 
 class SignalMessage(BaseModel):
@@ -26,6 +28,27 @@ class SignalMessage(BaseModel):
     from_agent: str = Field(default=None)
     to_agent: str = Field(default=None)
     content: Optional[str] = Field(default=None)
+
+
+class SimulationSignal(SignalMessage):
+    type: Signal = Signal.SIMULATION
+    to_agent: str = ActorName.ORCHESTRATOR
+    from_agent: str = "server"
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.SIMULATION
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.ORCHESTRATOR
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return "server"
 
 
 class Ack(SignalMessage):
@@ -41,6 +64,11 @@ class Message(BaseModel):
     content: str = Field(default=None)
     from_agent: str = Field(default=None)
     to_agent: str = Field(default=None)
+
+
+class SimulationMessage(Message):
+    status: SimulationStatus
+    progress: int
 
 
 class Status(SignalMessage):

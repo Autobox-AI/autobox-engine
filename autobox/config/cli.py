@@ -17,4 +17,11 @@ def parse_args():
         default="metrics.json",
         help="Path to the metrics file (optional)",
     )
+    parser.add_argument(
+        "--server",
+        type=str,
+        required=False,
+        default="server.json",
+        help="Path to the server configuration file (optional)",
+    )
     return parser.parse_args()
