@@ -151,7 +151,10 @@ class Simulator:
         return False, response.status, 0
 
     def create_actor_manager(self, agent_ids: dict):
-        return ActorManager(id=agent_ids["orchestrator"])
+        return ActorManager(
+            system=self.system,
+            orchestrator_actor=self.orchestrator
+        )
 
     def create_orchestrator(self, agent_ids: dict):
         return create_actor(

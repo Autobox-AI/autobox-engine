@@ -17,6 +17,7 @@ def prompt(task: str, agents: str) -> str:
 - Start interactions sequentially when the task clearly requires a primary agent to initiate the process.
 - Parallel instructions should only occur if explicitly appropriate, considering the task context.
 - The agents may or may not have direct instructions from the user. If present, a user instruction has more priority than anything else except if the simulation is completed. So your planner instructions must be based on the user instructions if they are present.
+- You MUST output progress 100 ONLY when the simulation is status=completed. Otherwise, progress MUST be always below 100.
 
 **Example of Instructions to Agents:**
 - Agent 1: "Please indicate your initial thoughts or first step regarding the current task."

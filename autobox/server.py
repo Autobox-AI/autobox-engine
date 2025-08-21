@@ -56,10 +56,34 @@ def create_app(actor_manager: ActorManager):
 
         async def update_status_cache():
             """Background task to periodically fetch status from orchestrator."""
+            terminal_statuses = {"completed", "failed", "timeout", "aborted", "stopped"}
+
             while True:
                 try:
                     if app.state.actor_manager:
+                        # Check if simulation already in terminal state
+                        current_status = app.state.simulation_cache.get(
+                            "status", ""
+                        ).lower()
+                        if current_status in terminal_statuses:
+                            logger.info(
+                                f"Simulation in terminal state: {current_status}. Stopping status updates."
+                            )
+                            break
+
                         loop = asyncio.get_event_loop()
+                        is_alive = await loop.run_in_executor(
+                            None, app.state.actor_manager.is_actor_alive
+                        )
+
+                        if not is_alive:
+                            logger.info(
+                                "Orchestrator actor is no longer alive. Stopping status updates."
+                            )
+                            app.state.simulation_cache["status"] = "stopped"
+                            app.state.simulation_cache["error"] = "Actor system stopped"
+                            break
+
                         response = await loop.run_in_executor(
                             None,
                             lambda: app.state.actor_manager.ask_simulation(
@@ -67,7 +91,6 @@ def create_app(actor_manager: ActorManager):
                             ),
                         )
 
-                        # Update cache
                         app.state.simulation_cache = {
                             "status": response.status,
                             "progress": response.progress,
@@ -77,14 +100,39 @@ def create_app(actor_manager: ActorManager):
                         logger.debug(
                             f"Status cache updated: {response.status} - {response.progress}%"
                         )
+
+                        if response.status.lower() in terminal_statuses:
+                            logger.info(
+                                f"Simulation completed with status: {response.status}. Stopping status updates."
+                            )
+                            break
                     else:
                         app.state.simulation_cache["error"] = (
                             "Actor system not initialized"
                         )
 
+                except RuntimeError as e:
+                    if "no longer alive" in str(e):
+                        logger.info(
+                            "Actor system confirmed stopped. Ending status updates."
+                        )
+                        app.state.simulation_cache["status"] = "stopped"
+                        app.state.simulation_cache["error"] = "Actor system stopped"
+                        break
+                    else:
+                        logger.error(f"Runtime error in status update: {e}")
+                        app.state.simulation_cache["error"] = str(e)
+
                 except Exception as e:
                     logger.error(f"Failed to update status cache: {e}")
                     app.state.simulation_cache["error"] = str(e)
+                    if "ActorException" in str(e) or "Actor not found" in str(e):
+                        logger.info(
+                            "Actor system appears to be stopped. Ending status updates."
+                        )
+                        app.state.simulation_cache["status"] = "stopped"
+                        app.state.simulation_cache["error"] = "Actor system stopped"
+                        break
 
                 await asyncio.sleep(1.0)
 
@@ -125,7 +173,6 @@ def create_app(actor_manager: ActorManager):
     async def shutdown_event():
         logger.info("Server is shutting down...")
 
-        # Cancel background task
         if app.state.cache_update_task:
             app.state.cache_update_task.cancel()
             try:
