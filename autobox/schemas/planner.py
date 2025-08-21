@@ -1,14 +1,8 @@
-from enum import Enum
 from typing import List
 
 from pydantic import BaseModel, Field
 
 from autobox.schemas.simulation import SimulationStatus
-
-
-class PlannerStatus(str, Enum):
-    IN_PROGRESS = "in progress"
-    COMPLETED = "completed"
 
 
 class Instruction(BaseModel):

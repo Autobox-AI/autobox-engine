@@ -7,11 +7,11 @@ from pydantic import BaseModel
 class SimulationStatus(str, Enum):
     STARTED = "started"
     IN_PROGRESS = "in progress"
-    NEW = "new"
     FAILED = "failed"
     COMPLETED = "completed"
     TIMEOUT = "timeout"
     ABORTED = "aborted"
+    NEW = "new"
 
 
 class SimulationResponse(BaseModel):

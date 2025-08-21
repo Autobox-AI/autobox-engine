@@ -57,7 +57,7 @@ class Orchestrator(BaseAgent):
         elif isinstance(message, SignalMessage):
             if message.type == Signal.START:
                 self.status = ActorStatus.RUNNING
-                self.simulation_status = SimulationStatus.IN_PROGRESS
+                self.simulation_status = SimulationStatus.STARTED
                 self.logger.info("Orchestrator starting...")
 
                 self.send(
