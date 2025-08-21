@@ -9,6 +9,7 @@ class SimulationStatus(str, Enum):
     IN_PROGRESS = "in progress"
     FAILED = "failed"
     COMPLETED = "completed"
+    SUMMARIZING = "summarizing"
     TIMEOUT = "timeout"
     ABORTED = "aborted"
     NEW = "new"
@@ -17,6 +18,7 @@ class SimulationStatus(str, Enum):
 class SimulationResponse(BaseModel):
     status: SimulationStatus
     progress: int
+    summary: Optional[str] = None
     last_updated: str
     error: Optional[str] = None
 

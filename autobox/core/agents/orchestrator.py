@@ -40,6 +40,7 @@ class Orchestrator(BaseAgent):
         self.workers = {}
         self.is_completed = False
         self.simulation_progress = 0
+        self.simulation_summary = None
         self.simulation_status: SimulationStatus = None
         self.name: str = ActorName.ORCHESTRATOR
 
@@ -52,6 +53,7 @@ class Orchestrator(BaseAgent):
                 SimulationMessage(
                     status=self.simulation_status,
                     progress=self.simulation_progress,
+                    summary=self.simulation_summary,
                 ),
             )
         elif isinstance(message, SignalMessage):
@@ -100,6 +102,9 @@ class Orchestrator(BaseAgent):
             if message.from_agent == ActorName.REPORTER:
                 self.logger.info("Orchestrator is completing...")
                 self.status = ActorStatus.COMPLETED
+                self.simulation_status = SimulationStatus.COMPLETED
+                self.simulation_progress = 100
+                self.simulation_summary = message.content
                 return
 
             self.memory.remove_if_pending(message.from_agent)
@@ -109,8 +114,6 @@ class Orchestrator(BaseAgent):
                 self.logger.info(
                     f"Orchestrator received plan with {len(planner_output.instructions)} instructions: {planner_output.thinking_process}"
                 )
-                self.simulation_progress = planner_output.progress
-                self.simulation_status = planner_output.status
 
                 for instruction in planner_output.instructions:
                     self.logger.info(
@@ -118,6 +121,7 @@ class Orchestrator(BaseAgent):
                     )
 
                 if planner_output.status == SimulationStatus.COMPLETED:
+                    self.simulation_status = SimulationStatus.SUMMARIZING
                     self.send(
                         self.reporter,
                         Message(
@@ -128,6 +132,10 @@ class Orchestrator(BaseAgent):
                     )
                     self.memory.add_pending("reporter")
                     return
+                else:
+                    self.simulation_status = planner_output.status
+                    self.simulation_progress = planner_output.progress
+
                 for instruction in planner_output.instructions:
                     self.send(
                         self.workers[instruction.agent_name],

@@ -33,6 +33,7 @@ def create_app(actor_manager: ActorManager):
     app.state.simulation_cache = {
         "status": "initializing",
         "progress": 0,
+        "summary": None,
         "last_updated": None,
         "error": None,
     }
@@ -94,6 +95,7 @@ def create_app(actor_manager: ActorManager):
                         app.state.simulation_cache = {
                             "status": response.status,
                             "progress": response.progress,
+                            "summary": response.summary,
                             "last_updated": datetime.now().isoformat(),
                             "error": None,
                         }
@@ -154,6 +156,7 @@ def create_app(actor_manager: ActorManager):
         return SimulationResponse(
             status=cache.get("status", "unknown"),
             progress=cache.get("progress", 0),
+            summary=cache.get("summary"),
             last_updated=cache.get("last_updated"),
             error=cache.get("error"),
         )
@@ -166,7 +169,6 @@ def create_app(actor_manager: ActorManager):
             "actor_connected": app.state.actor_manager is not None,
             "cache_status": "active" if cache.get("last_updated") else "waiting",
             "last_cache_update": cache.get("last_updated"),
-            "simulator": "TODO",  # count_active_simulations(),
         }
 
     @app.on_event("shutdown")
