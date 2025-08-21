@@ -143,7 +143,48 @@ docker-compose down
 
 ## API Endpoints
 
-The integrated FastAPI server provides real-time monitoring and control. The server port is configured in your server config file (e.g., `examples/server/default.json`):
+The integrated FastAPI server provides real-time monitoring and control. The server port is configured in your server config file (e.g., `examples/server/default.json`).
+
+### Server Configuration
+
+The server behavior can be configured through JSON files in `examples/server/`:
+
+```json
+{
+    "host": "0.0.0.0",
+    "port": 9000,
+    "reload": false,
+    "logging": {
+        "verbose": false,
+        "log_path": "logs",
+        "log_file": "server.log"
+    },
+    "exit_on_completion": false  // Controls server lifecycle
+}
+```
+
+**Server Lifecycle Options:**
+- `exit_on_completion: false` (default) - Server keeps running after simulation completes, useful for:
+  - Reviewing final results via API
+  - Running multiple simulations
+  - Development and debugging
+- `exit_on_completion: true` - Server terminates when simulation finishes, useful for:
+  - Automated pipelines
+  - CI/CD environments
+  - Batch processing
+
+Example usage:
+```bash
+# Keep server running after simulation
+uv run autobox --config examples/simulations/summer_vacation.json \
+               --metrics examples/metrics/summer_vacation.json \
+               --server examples/server/default.json
+
+# Exit when simulation completes
+uv run autobox --config examples/simulations/summer_vacation.json \
+               --metrics examples/metrics/summer_vacation.json \
+               --server examples/server/exit_on_completion.json
+```
 
 ### Status & Monitoring
 
