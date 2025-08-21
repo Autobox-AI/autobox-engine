@@ -19,3 +19,7 @@ wheels/
 
 # Python
 .pytest_cache/
+
+
+# Logs
+*.log
