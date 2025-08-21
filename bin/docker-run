@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# Run Docker container with proper configuration
 set -e
 
 # Check if OPENAI_API_KEY is set
@@ -13,9 +12,10 @@ fi
 # Default values
 CONFIG="examples/simulations/summer_vacation.json"
 METRICS="examples/metrics/summer_vacation.json"
+SERVER="examples/server/default.json"
 IMAGE_TAG="latest"
+HOST_PORT=""
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --config|-c)
@@ -26,8 +26,16 @@ while [[ $# -gt 0 ]]; do
             METRICS="$2"
             shift 2
             ;;
+        --server|-s)
+            SERVER="$2"
+            shift 2
+            ;;
         --tag|-t)
             IMAGE_TAG="$2"
+            shift 2
+            ;;
+        --host-port|-p)
+            HOST_PORT="$2"
             shift 2
             ;;
         --help|-h)
@@ -37,6 +45,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -c, --config FILE   Simulation config file (default: examples/simulations/summer_vacation.json)"
             echo "  -m, --metrics FILE  Metrics config file (default: examples/metrics/summer_vacation.json)"
             echo "  -t, --tag TAG       Docker image tag (default: latest)"
+            echo "  -p, --host-port PORT  Host port to bind (default: auto-detect free port)"
             echo "  -h, --help          Show this help message"
             exit 0
             ;;
@@ -47,23 +56,76 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Get absolute paths
 CONFIG_DIR=$(dirname "$(realpath "$CONFIG")")
 CONFIG_FILE=$(basename "$CONFIG")
 METRICS_DIR=$(dirname "$(realpath "$METRICS")")
 METRICS_FILE=$(basename "$METRICS")
+SERVER_DIR=$(dirname "$(realpath "$SERVER")")
+SERVER_FILE=$(basename "$SERVER")
+
+SERVER_PORT=$(grep -o '"port":[[:space:]]*[0-9]*' "$SERVER" | grep -o '[0-9]*$')
+if [ -z "$SERVER_PORT" ]; then
+    echo "Warning: Could not determine port from server config, using default 9000"
+    SERVER_PORT=9000
+fi
+
+find_free_port() {
+    local start_port=$1
+    local port=$start_port
+    local max_attempts=100
+    local attempt=0
+
+    # Works on both macOS and Linux
+    while [ $attempt -lt $max_attempts ]; do
+        if ! nc -z localhost "$port" 2>/dev/null; then
+            echo "$port"
+            return 0
+        fi
+        port=$((port + 1))
+        attempt=$((attempt + 1))
+    done
+
+    echo 0
+    return 1
+}
+
+if [ -z "$HOST_PORT" ]; then
+    HOST_PORT=$(find_free_port "$SERVER_PORT")
+    if [ "$HOST_PORT" = "0" ]; then
+        echo "Warning: Could not find a free port in range $SERVER_PORT-$((SERVER_PORT + 100))"
+        echo "Docker will assign a random available port"
+        HOST_PORT=""
+    elif [ "$HOST_PORT" != "$SERVER_PORT" ]; then
+        echo "Note: Port $SERVER_PORT is in use, using port $HOST_PORT on host instead"
+    fi
+fi
 
 echo "Running autobox-engine container..."
 echo "Config: $CONFIG"
 echo "Metrics: $METRICS"
+echo "Server: $SERVER (container port: $SERVER_PORT)"
+if [ -n "$HOST_PORT" ]; then
+    echo "Host port: $HOST_PORT -> Container port: $SERVER_PORT"
+else
+    echo "Host port: Docker will assign a random available port"
+fi
+
+if [ -n "$HOST_PORT" ]; then
+    PORT_FLAG="-p $HOST_PORT:$SERVER_PORT"
+else
+    PORT_FLAG="-P"
+fi
 
 docker run \
     --rm \
     -it \
+    $PORT_FLAG \
     -e OPENAI_API_KEY="$OPENAI_API_KEY" \
     -v "$CONFIG_DIR:/app/configs/simulations:ro" \
     -v "$METRICS_DIR:/app/configs/metrics:ro" \
+    -v "$SERVER_DIR:/app/configs/server:ro" \
     -v "$(pwd)/logs:/app/logs" \
     "autobox-engine:${IMAGE_TAG}" \
     --config "/app/configs/simulations/$CONFIG_FILE" \
-    --metrics "/app/configs/metrics/$METRICS_FILE"
+    --metrics "/app/configs/metrics/$METRICS_FILE" \
+    --server "/app/configs/server/$SERVER_FILE"

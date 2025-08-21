@@ -94,6 +94,17 @@ uv run autobox-safe --config examples/simulations/summer_vacation.json --metrics
 
 ### Running with Docker
 
+**Intelligent Port Mapping:** The Docker container automatically:
+- Reads the server port from your server configuration file
+- Finds a free port on the host (starting from the configured port)
+- Maps the host port to the container port
+- Falls back to Docker's random port assignment if needed
+
+For example, if your server config specifies port 9000 but it's already in use:
+- The script will try ports 9001, 9002, etc., until it finds a free one
+- It will inform you which port was actually used
+- You can override this with `--host-port` to specify an exact port
+
 ```bash
 # Run with docker-compose
 docker-compose up
@@ -101,8 +112,11 @@ docker-compose up
 # Run in background
 docker-compose up -d
 
-# Run with custom script
+# Run with automatic free port detection
 ./bin/docker-run
+
+# Run with specific host port
+./bin/docker-run --host-port 8080
 
 # Run with custom configuration
 ./bin/docker-run --config path/to/config.json --metrics path/to/metrics.json
@@ -129,19 +143,20 @@ docker-compose down
 
 ## API Endpoints
 
-The integrated FastAPI server provides real-time monitoring and control:
+The integrated FastAPI server provides real-time monitoring and control. The server port is configured in your server config file (e.g., `examples/server/default.json`):
 
 ### Status & Monitoring
 
 ```bash
+# Replace <PORT> with the port configured in your server config file
 # Check server connectivity (tests actor communication)
-curl http://localhost:5000/ping
+curl http://localhost:<PORT>/ping
 
 # Get simulation status (from cache, instant response)
-curl http://localhost:5000/status
+curl http://localhost:<PORT>/status
 
 # Server health check
-curl http://localhost:5000/health
+curl http://localhost:<PORT>/health
 ```
 
 ### Example: Monitor Running Simulation
@@ -150,13 +165,13 @@ curl http://localhost:5000/health
 # 1. Start simulation - note the SIMULATION ID in logs
 ./bin/run
 
-# 2. In another terminal, check status
+# 2. In another terminal, check status (replace <PORT> with your configured port)
 SIMULATION_ID=4dff2857-4e08-49c6-b087-49c6e6a8c88f
-curl http://localhost:5000/status
+curl http://localhost:<PORT>/status
 
 # 3. Watch progress in real-time
 while true; do
-  curl -s http://localhost:5000/status | jq '.progress'
+  curl -s http://localhost:<PORT>/status | jq '.progress'
   sleep 1
 done
 ```
@@ -253,7 +268,7 @@ The project uses shell scripts in the `bin/` directory for common tasks:
 - `bin/test` - Run tests
 - `bin/test-cov` - Run tests with coverage
 - `bin/docker-build` - Build Docker images
-- `bin/docker-run` - Run Docker container
+- `bin/docker-run` - Run Docker container with intelligent port mapping
 - `bin/docker-clean` - Clean up Docker images
 
 All scripts support `--help` for usage information.

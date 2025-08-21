@@ -169,16 +169,9 @@ class Orchestrator(BaseAgent):
 
     def handle_init(self, sender: ActorAddress, message: Init):
         self.id = message.agent_ids["orchestrator"]
-        self.simulation_id = self.id  # Set simulation ID for publisher
+        self.simulation_id = self.id
         self.simulation_status = SimulationStatus.NEW
 
-        # Log simulation ID for easy access
-        self.logger.info("=" * 60)
-        self.logger.info(f"SIMULATION ID: {self.simulation_id}")
-        self.logger.info("=" * 60)
-        self.logger.info("Use this ID to check status:")
-        self.logger.info("  curl http://localhost:5000/status")
-        self.logger.info("=" * 60)
         workers_info = json.dumps(
             [
                 {

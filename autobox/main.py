@@ -61,13 +61,12 @@ async def main():
 
     simulator = Simulator(config=config)
 
-    # Log simulation ID for easy access
     simulation_id = simulator.agent_ids.get("orchestrator", "unknown")
     app_logger.info("=" * 60)
     app_logger.info("🚀 SIMULATION STARTING")
     app_logger.info(f"📝 SIMULATION ID: {simulation_id}")
     app_logger.info("🔍 Check status with:")
-    app_logger.info(f"   curl http://localhost:5000/simulations/{simulation_id}")
+    app_logger.info(f"   curl http://localhost:{config.server.port}/status")
     app_logger.info("=" * 60)
 
     runner = Runner(simulator=simulator)
