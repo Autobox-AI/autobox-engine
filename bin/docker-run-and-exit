@@ -12,7 +12,7 @@ fi
 # Default values
 CONFIG="examples/simulations/summer_vacation.json"
 METRICS="examples/metrics/summer_vacation.json"
-SERVER="examples/server/default.json"
+SERVER="examples/server/exit_on_completion.json"
 IMAGE_TAG="latest"
 HOST_PORT=""
 
