@@ -6,6 +6,19 @@
 
 A powerful engine for running dynamic agent-based simulations where AI actors interact, negotiate, and collaborate to explore complex scenarios.
 
+## Disclaimer
+
+**Note**: This project is currently a proof of concept and not production-ready. It is evolving rapidly toward a stable release. In the interim:
+- Code cleanup and de-duplication are in progress; expect redundant or experimental code paths.
+- APIs/CLIs/configs are unstable and may change without notice.
+- Tests are incomplete; coverage and reliability work is ongoing.
+- Performance tuning and observability are pending; current benchmarks/logging are provisional.
+- Security hardening is underway; do not use with sensitive data or on untrusted networks.
+- Documentation may lag behind the code and contain gaps.
+- CI/CD, linting, and type checks are being standardized and may be flaky.
+- Dependency versions may change until a stable release.
+
+
 ## Quick Start
 
 ### Prerequisites
