@@ -43,137 +43,19 @@ class Orchestrator(BaseAgent):
         self.name: str = ActorName.ORCHESTRATOR
 
     def receiveMessage(self, message, sender):
+        """Main message handler - delegates to specific handlers based on message type."""
         if isinstance(message, InitOrchestrator):
             self.handle_init(sender, message)
         elif isinstance(message, SimulationSignal):
-            self.send(
-                sender,
-                SimulationMessage(
-                    status=self.simulation_status,
-                    progress=self.simulation_progress,
-                    summary=self.simulation_summary,
-                ),
-            )
+            self._handle_simulation_signal(sender)
         elif isinstance(message, SignalMessage):
-            if message.type == Signal.START:
-                self.status = ActorStatus.RUNNING
-                self.simulation_status = SimulationStatus.STARTED
-                self.logger.info("Orchestrator starting...")
-
-                self.send(
-                    self.addresses["planner"],
-                    SignalMessage(
-                        from_agent=self.name,
-                        to_agent=ActorName.PLANNER,
-                        type=Signal.PLAN,
-                    ),
-                )
-                self.send(sender, Ack(from_agent=self.name, to_agent="simulator"))
-            elif message.type == Signal.ACKED:
-                self.logger.info(
-                    f"{message.from_agent} acknowledged: {message.content}"
-                )
-            elif message.type == Signal.STATUS:
-                self.send(
-                    sender,
-                    Status(
-                        from_agent=self.name, to_agent="simulator", status=self.status
-                    ),
-                )
-            elif message.type == Signal.STOP:
-                self.send(self.myAddress, ActorExitRequest())
-                self.status = ActorStatus.STOPPED
-                self.logger.info("Orchestrator stopped all agents")
-                self.send(
-                    sender,
-                    Status(
-                        from_agent=self.name, to_agent="simulator", status=self.status
-                    ),
-                )
-            elif message.type == Signal.UNKNOWN:
-                self.logger.info(
-                    f"Orchestrator received unknown message from {message.from_agent}: {message}"
-                )
+            self._handle_signal_message(message, sender)
         elif isinstance(message, InstructionMessage):
-            self.send(
-                self.addresses[message.agent_name],
-                Message(
-                    from_agent=self.name,
-                    to_agent=message.agent_name,
-                    content=message.content,
-                ),
-            )
-            self.logger.info(
-                f"Orchestrator received instruction from {message.agent_name}: {message.content}"
-            )
+            self._handle_instruction_message(message)
         elif isinstance(message, Message):
-            self.memory.add_message(message)
-
-            if message.from_agent == ActorName.REPORTER:
-                self.logger.info("Orchestrator is completing...")
-                self.status = ActorStatus.COMPLETED
-                self.simulation_status = SimulationStatus.COMPLETED
-                self.simulation_progress = 100
-                self.simulation_summary = message.content
-                return
-
-            self.memory.remove_if_pending(message.from_agent)
-
-            if message.from_agent == ActorName.PLANNER:
-                planner_output = PlannerOutput.model_validate_json(message.content)
-                self.logger.info(
-                    f"Orchestrator received plan with {len(planner_output.instructions)} instructions: {planner_output.thinking_process}"
-                )
-
-                for instruction in planner_output.instructions:
-                    self.logger.info(
-                        f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
-                    )
-
-                if planner_output.status == SimulationStatus.COMPLETED:
-                    self.simulation_status = SimulationStatus.SUMMARIZING
-                    self.send(
-                        self.addresses["reporter"],
-                        Message(
-                            from_agent=self.name,
-                            to_agent=ActorName.REPORTER,
-                            content=self.memory.get_history_between_worker_str(),
-                        ),
-                    )
-                    self.memory.add_pending("reporter")
-                    return
-                else:
-                    self.simulation_status = planner_output.status
-                    self.simulation_progress = planner_output.progress
-
-                for instruction in planner_output.instructions:
-                    self.send(
-                        self.addresses[instruction.agent_name],
-                        Message(
-                            from_agent=self.name,
-                            to_agent=instruction.agent_name,
-                            content=instruction.instruction,
-                        ),
-                    )
-                    self.memory.add_pending(instruction.agent_name)
-            else:
-                self.logger.info(
-                    f"Orchestrator received message from {message.from_agent}: {message.content}"
-                )
-
-                if self.memory.has_pending():
-                    return
-
-                self.send(
-                    self.addresses["planner"],
-                    Message(
-                        from_agent=self.name,
-                        to_agent=ActorName.PLANNER,
-                        content=self.memory.get_history_str(),
-                    ),
-                )
+            self._handle_agent_message(message)
         elif isinstance(message, ActorExitRequest):
-            pass
+            pass  # Normal exit request
         else:
             self.logger.info(
                 f"Orchestrator received unknown message from {sender}: {message}"
@@ -184,6 +66,195 @@ class Orchestrator(BaseAgent):
         self.send(self.myAddress, ActorExitRequest())
         self.status = ActorStatus.STOPPED
         self.logger.info("Orchestrator stopped all agents")
+
+    def _handle_simulation_signal(self, sender):
+        """Send current simulation status to requestor."""
+        self.send(
+            sender,
+            SimulationMessage(
+                status=self.simulation_status,
+                progress=self.simulation_progress,
+                summary=self.simulation_summary,
+            ),
+        )
+    
+    def _handle_signal_message(self, message, sender):
+        """Process various signal messages."""
+        signal_handlers = {
+            Signal.START: lambda: self._handle_start_signal(sender),
+            Signal.ACKED: lambda: self._handle_ack_signal(message),
+            Signal.STATUS: lambda: self._handle_status_signal(sender),
+            Signal.STOP: lambda: self._handle_stop_signal(sender),
+            Signal.UNKNOWN: lambda: self._handle_unknown_signal(message),
+        }
+        
+        handler = signal_handlers.get(message.type)
+        if handler:
+            handler()
+    
+    def _handle_start_signal(self, sender):
+        """Start the simulation."""
+        self.status = ActorStatus.RUNNING
+        self.simulation_status = SimulationStatus.STARTED
+        self.logger.info("Orchestrator starting...")
+        
+        self.send(
+            self.addresses["planner"],
+            SignalMessage(
+                from_agent=self.name,
+                to_agent=ActorName.PLANNER,
+                type=Signal.PLAN,
+            ),
+        )
+        self.send(sender, Ack(from_agent=self.name, to_agent="simulator"))
+    
+    def _handle_ack_signal(self, message):
+        """Handle acknowledgment signal."""
+        self.logger.info(
+            f"{message.from_agent} acknowledged: {message.content}"
+        )
+    
+    def _handle_status_signal(self, sender):
+        """Send status to requestor."""
+        self.send(
+            sender,
+            Status(
+                from_agent=self.name, 
+                to_agent="simulator", 
+                status=self.status
+            ),
+        )
+    
+    def _handle_stop_signal(self, sender):
+        """Stop orchestrator and all agents."""
+        self.send(self.myAddress, ActorExitRequest())
+        self.status = ActorStatus.STOPPED
+        self.logger.info("Orchestrator stopped all agents")
+        self.send(
+            sender,
+            Status(
+                from_agent=self.name, 
+                to_agent="simulator", 
+                status=self.status
+            ),
+        )
+    
+    def _handle_unknown_signal(self, message):
+        """Handle unknown signal."""
+        self.logger.info(
+            f"Orchestrator received unknown message from {message.from_agent}: {message}"
+        )
+    
+    def _handle_instruction_message(self, message):
+        """Forward instruction to specific agent."""
+        self.send(
+            self.addresses[message.agent_name],
+            Message(
+                from_agent=self.name,
+                to_agent=message.agent_name,
+                content=message.content,
+            ),
+        )
+        self.logger.info(
+            f"Orchestrator received instruction from {message.agent_name}: {message.content}"
+        )
+    
+    def _handle_agent_message(self, message):
+        """Process messages from agents."""
+        self.memory.add_message(message)
+        
+        # Handle reporter completion
+        if message.from_agent == ActorName.REPORTER:
+            self._handle_reporter_completion(message)
+            return
+        
+        self.memory.remove_if_pending(message.from_agent)
+        
+        # Handle planner messages
+        if message.from_agent == ActorName.PLANNER:
+            self._handle_planner_message(message)
+        else:
+            self._handle_worker_message(message)
+    
+    def _handle_reporter_completion(self, message):
+        """Handle completion message from reporter."""
+        self.logger.info("Orchestrator is completing...")
+        self.status = ActorStatus.COMPLETED
+        self.simulation_status = SimulationStatus.COMPLETED
+        self.simulation_progress = 100
+        self.simulation_summary = message.content
+    
+    def _handle_planner_message(self, message):
+        """Process plan from planner."""
+        planner_output = PlannerOutput.model_validate_json(message.content)
+        self.logger.info(
+            f"Orchestrator received plan with {len(planner_output.instructions)} "
+            f"instructions: {planner_output.thinking_process}"
+        )
+        
+        # Log instructions
+        for instruction in planner_output.instructions:
+            self.logger.info(
+                f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
+            )
+        
+        # Check if simulation is completed
+        if planner_output.status == SimulationStatus.COMPLETED:
+            self._initiate_reporting()
+            return
+        
+        # Update simulation status
+        self.simulation_status = planner_output.status
+        self.simulation_progress = planner_output.progress
+        
+        # Send instructions to agents
+        self._distribute_instructions(planner_output.instructions)
+    
+    def _handle_worker_message(self, message):
+        """Process message from worker agent."""
+        self.logger.info(
+            f"Orchestrator received message from {message.from_agent}: {message.content}"
+        )
+        
+        # If there are pending responses, wait
+        if self.memory.has_pending():
+            return
+        
+        # Send history to planner for next step
+        self.send(
+            self.addresses["planner"],
+            Message(
+                from_agent=self.name,
+                to_agent=ActorName.PLANNER,
+                content=self.memory.get_history_str(),
+            ),
+        )
+    
+    def _initiate_reporting(self):
+        """Start the reporting phase."""
+        self.simulation_status = SimulationStatus.SUMMARIZING
+        self.send(
+            self.addresses["reporter"],
+            Message(
+                from_agent=self.name,
+                to_agent=ActorName.REPORTER,
+                content=self.memory.get_history_between_worker_str(),
+            ),
+        )
+        self.memory.add_pending("reporter")
+    
+    def _distribute_instructions(self, instructions):
+        """Send instructions to respective agents."""
+        for instruction in instructions:
+            self.send(
+                self.addresses[instruction.agent_name],
+                Message(
+                    from_agent=self.name,
+                    to_agent=instruction.agent_name,
+                    content=instruction.instruction,
+                ),
+            )
+            self.memory.add_pending(instruction.agent_name)
 
     def handle_init(self, sender: ActorAddress, message: InitOrchestrator):
         self.id = message.agent_ids_by_name["orchestrator"]

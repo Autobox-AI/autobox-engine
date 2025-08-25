@@ -19,54 +19,35 @@ from autobox.schemas.planner import PlannerOutput
 
 class Planner(BaseAgent):
     def __init__(self):
-        super().__init__()
-        self.name: str = ActorName.PLANNER
+        super().__init__(name=ActorName.PLANNER)
 
     def receiveMessage(self, message, sender):
         if isinstance(message, InitPlanner):
-            self.id = message.id
-            self.llm = LLM(
-                system_prompt=system_prompt(
-                    task=message.task,
-                    agents=message.workers_info,
-                ),
-                model=message.config.llm.model,
-            )
-            self.status = ActorStatus.INITIALIZED
-            self.send(
+            self._initialize_agent(
+                message, 
                 sender,
-                Ack(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    content="initialized",
-                ),
+                system_prompt,
+                task=message.task,
+                agents=message.workers_info,
             )
-            self.logger.info(f"Planner initialized (pid: {os.getpid()})")
         elif isinstance(message, SignalMessage):
             if message.type == Signal.PLAN:
                 self.plan(sender)
             elif message.type == Signal.STOP:
-                self.send(self.myAddress, ActorExitRequest())
-                self.status = ActorStatus.STOPPED
-                self.logger.info("Planner stopped")
+                self._handle_stop_signal()
         elif isinstance(message, InstructionMessage):
-            self.instruction = message.content
-            self.logger.info(f"Planner received instruction: {message.content}")
+            self._handle_instruction(message)
         elif isinstance(message, Message):
             self.memory.add_message(message)
             self.plan(sender, message.content)
         else:
-            self.logger.info(f"Planner received unknown message: {message}")
-            self.send(
-                sender,
-                SignalMessage(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    type=Signal.UNKNOWN,
-                ),
-            )
+            self._log_unknown_message(message)
+            self._send_unknown_signal(sender)
 
-    def plan(self, sender: ActorAddress, content: str = None) -> PlannerOutput:
+    def plan(self, sender: ActorAddress, user_prompt: str = None):
+        """Generate a plan based on the current context."""
+        self.logger.info("Planner is planning...")
+        
         chat_completion_messages = [
             {
                 "role": "user",
@@ -74,7 +55,7 @@ class Planner(BaseAgent):
             },
             {
                 "role": "user",
-                "content": f"CONVERSATION HISTORY: {content}",
+                "content": f"CONVERSATION HISTORY: {user_prompt if user_prompt else ''}",
             },
             {
                 "role": "user",
@@ -82,9 +63,12 @@ class Planner(BaseAgent):
             },
         ]
 
-        completion = self.llm.think(chat_completion_messages, schema=PlannerOutput)
-
+        completion = self.llm.think(
+            chat_completion_messages, schema=PlannerOutput
+        )
+        
         planner_output: PlannerOutput = completion.choices[0].message.parsed
+        self.logger.info(f"Planning: {planner_output.thinking_process}")
 
         self.send(
             sender,
