@@ -17,49 +17,28 @@ from autobox.schemas.message import (
 
 class Evaluator(BaseAgent):
     def __init__(self):
-        super().__init__()
-        self.name: str = ActorName.EVALUATOR
+        super().__init__(name=ActorName.EVALUATOR)
 
     def receiveMessage(self, message, sender):
         self.memory.add_message(message)
+        
         if isinstance(message, InitEvaluator):
-            self.id = message.id
-            self.llm = LLM(
-                system_prompt=system_prompt(
-                    task=message.task,
-                    agents=message.workers_info,
-                    metrics=message.metrics_definitions,
-                ),
-                model=message.config.llm.model,
-            )
-            self.status = ActorStatus.INITIALIZED
-            self.send(
+            self._initialize_agent(
+                message,
                 sender,
-                Ack(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    content="initialized",
-                ),
+                system_prompt,
+                task=message.task,
+                agents=message.workers_info,
+                metrics=message.metrics_definitions,
             )
-            self.logger.info(f"Evaluator initialized (pid: {os.getpid()})")
         elif isinstance(message, InstructionMessage):
-            self.instruction = message.content
-            self.logger.info(f"Evaluator received instruction: {message.content}")
+            self._handle_instruction(message)
         elif isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
-                self.send(self.myAddress, ActorExitRequest())
-                self.status = ActorStatus.STOPPED
-                self.logger.info("Evaluator stopped")
+                self._handle_stop_signal()
         else:
-            self.logger.info(f"Evaluator received unknown message: {message}")
-            self.send(
-                sender,
-                SignalMessage(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    type=Signal.UNKNOWN,
-                ),
-            )
+            self._log_unknown_message(message)
+            self._send_unknown_signal(sender)
 
         # if self.finish_if_end(message):
         #     return

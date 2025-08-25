@@ -18,71 +18,54 @@ from autobox.schemas.message import (
 
 class Reporter(BaseAgent):
     def __init__(self):
-        super().__init__()
-        self.name: str = ActorName.REPORTER
+        super().__init__(name=ActorName.REPORTER)
 
     def receiveMessage(self, message, sender):
         if isinstance(message, InitReporter):
-            self.id = message.id
-            self.llm = LLM(
-                system_prompt=system_prompt(
-                    task=message.task,
-                    agents=message.workers_info,
-                ),
-                model=message.config.llm.model,
-            )
-            self.status = ActorStatus.INITIALIZED
-            self.send(
+            self._initialize_agent(
+                message,
                 sender,
-                Ack(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    content="initialized",
-                ),
+                system_prompt,
+                task=message.task,
+                agents=message.workers_info,
             )
-            self.logger.info(f"Reporter initialized (pid: {os.getpid()})")
         elif isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
-                self.send(self.myAddress, ActorExitRequest())
-                self.status = ActorStatus.STOPPED
-                self.logger.info("Reporter stopped")
+                self._handle_stop_signal()
         elif isinstance(message, InstructionMessage):
-            self.instruction = message.content
-            self.logger.info(f"Reporter received instruction: {message.content}")
+            self._handle_instruction(message)
         elif isinstance(message, Message):
-            self.logger.info("Reporter is summarizing...")
-            self.memory.add_message(message)
-            chat_completion_messages = [
-                {
-                    "role": "user",
-                    "content": f"CONVERSATION HISTORY: {message.content}",
-                },
-                {
-                    "role": "user",
-                    "content": f"HUMAN USER INSTRUCTIONS: {self.instruction}",
-                },
-            ]
-
-            completion = self.llm.think(chat_completion_messages)
-            value: str = completion.choices[0].message.content
-
-            self.logger.info(f"Summary: {value}")
-
-            self.send(
-                sender,
-                Message(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    content=value,
-                ),
-            )
+            self._generate_report(message, sender)
         else:
-            self.logger.info(f"Reporter received unknown message: {message}")
-            self.send(
-                sender,
-                SignalMessage(
-                    from_agent=self.name,
-                    to_agent=ActorName.ORCHESTRATOR,
-                    type=Signal.UNKNOWN,
-                ),
-            )
+            self._log_unknown_message(message)
+            self._send_unknown_signal(sender)
+    
+    def _generate_report(self, message, sender):
+        """Generate a report based on conversation history."""
+        self.logger.info("Reporter is summarizing...")
+        self.memory.add_message(message)
+        
+        chat_completion_messages = [
+            {
+                "role": "user",
+                "content": f"CONVERSATION HISTORY: {message.content}",
+            },
+            {
+                "role": "user",
+                "content": f"HUMAN USER INSTRUCTIONS: {self.instruction}",
+            },
+        ]
+
+        completion = self.llm.think(chat_completion_messages)
+        value: str = completion.choices[0].message.content
+
+        self.logger.info(f"Summary: {value}")
+
+        self.send(
+            sender,
+            Message(
+                from_agent=self.name,
+                to_agent=ActorName.ORCHESTRATOR,
+                content=value,
+            ),
+        )
