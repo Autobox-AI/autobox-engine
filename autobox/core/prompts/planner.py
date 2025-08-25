@@ -19,6 +19,7 @@ def prompt(task: str, agents: str) -> str:
 - The agents may or may not have direct instructions from the user. If present, a user instruction has more priority than anything else except if the simulation is completed. So your planner instructions must be based on the user instructions if they are present.
 - You MUST output progress 100 ONLY when the simulation is status=completed. Otherwise, progress MUST be always below 100.
 - You MUST output status "STARTED" ONLY if progress is 0 and no other status is present.
+- You MUST take in consideration the HUMAN USER INSTRUCTIONS for planning ONLY when they are present. This has more priority than anything else except if the simulation is completed or there is no user instruction at all.
 
 **Example of Instructions to Agents:**
 - Agent 1: "Please indicate your initial thoughts or first step regarding the current task."

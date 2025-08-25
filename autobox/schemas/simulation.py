@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SimulationStatus(str, Enum):
@@ -16,11 +16,10 @@ class SimulationStatus(str, Enum):
 
 
 class SimulationResponse(BaseModel):
+    model_config = ConfigDict(exclude_none=True)
+
     status: SimulationStatus
     progress: int
     summary: Optional[str] = None
     last_updated: str
     error: Optional[str] = None
-
-    class Config:
-        exclude_none = True

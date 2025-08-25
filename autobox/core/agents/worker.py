@@ -7,7 +7,14 @@ from autobox.core.ai.llm import LLM
 from autobox.core.prompts.worker import prompt as system_prompt
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import WorkerConfig
-from autobox.schemas.message import Ack, InitAgent, Message, Signal, SignalMessage
+from autobox.schemas.message import (
+    Ack,
+    InitAgent,
+    InstructionMessage,
+    Message,
+    Signal,
+    SignalMessage,
+)
 
 
 class Worker(BaseAgent):
@@ -48,6 +55,11 @@ class Worker(BaseAgent):
                 self.send(self.myAddress, ActorExitRequest())
                 self.status = ActorStatus.STOPPED
                 self.logger.info(f"Worker {self.name} stopped")
+        elif isinstance(message, InstructionMessage):
+            self.instruction = message.content
+            self.logger.info(
+                f"Worker {self.name} received instruction: {message.content}"
+            )
         elif isinstance(message, Message):
             self.memory.add_message(message)
 
@@ -60,7 +72,7 @@ class Worker(BaseAgent):
                 },
                 {
                     "role": "user",
-                    "content": f"INSTRUCTION FOR THIS ITERATION: {message.content}",
+                    "content": f"INSTRUCTION FOR THIS ITERATION: {self.instruction if self.instruction else message.content}",
                 },
             ]
 

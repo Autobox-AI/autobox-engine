@@ -6,7 +6,14 @@ from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.reporter import prompt as system_prompt
 from autobox.schemas.actor import ActorName, ActorStatus
-from autobox.schemas.message import Ack, InitReporter, Message, Signal, SignalMessage
+from autobox.schemas.message import (
+    Ack,
+    InitReporter,
+    InstructionMessage,
+    Message,
+    Signal,
+    SignalMessage,
+)
 
 
 class Reporter(BaseAgent):
@@ -39,6 +46,9 @@ class Reporter(BaseAgent):
                 self.send(self.myAddress, ActorExitRequest())
                 self.status = ActorStatus.STOPPED
                 self.logger.info("Reporter stopped")
+        elif isinstance(message, InstructionMessage):
+            self.instruction = message.content
+            self.logger.info(f"Reporter received instruction: {message.content}")
         elif isinstance(message, Message):
             self.logger.info("Reporter is summarizing...")
             self.memory.add_message(message)
@@ -46,6 +56,10 @@ class Reporter(BaseAgent):
                 {
                     "role": "user",
                     "content": f"CONVERSATION HISTORY: {message.content}",
+                },
+                {
+                    "role": "user",
+                    "content": f"HUMAN USER INSTRUCTIONS: {self.instruction}",
                 },
             ]
 

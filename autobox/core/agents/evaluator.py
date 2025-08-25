@@ -6,7 +6,13 @@ from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.evaluator import prompt as system_prompt
 from autobox.schemas.actor import ActorName, ActorStatus
-from autobox.schemas.message import Ack, InitEvaluator, Signal, SignalMessage
+from autobox.schemas.message import (
+    Ack,
+    InitEvaluator,
+    InstructionMessage,
+    Signal,
+    SignalMessage,
+)
 
 
 class Evaluator(BaseAgent):
@@ -36,6 +42,9 @@ class Evaluator(BaseAgent):
                 ),
             )
             self.logger.info(f"Evaluator initialized (pid: {os.getpid()})")
+        elif isinstance(message, InstructionMessage):
+            self.instruction = message.content
+            self.logger.info(f"Evaluator received instruction: {message.content}")
         elif isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
                 self.send(self.myAddress, ActorExitRequest())

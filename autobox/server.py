@@ -4,12 +4,13 @@ import sys
 from datetime import datetime
 from threading import Lock
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from autobox.actor.manager import ActorManager
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.config import ServerConfig
+from autobox.schemas.instruction import InstructionRequest
 from autobox.schemas.message import SimulationSignal
 from autobox.schemas.simulation import SimulationResponse
 
@@ -160,6 +161,13 @@ def create_app(actor_manager: ActorManager):
             last_updated=cache.get("last_updated"),
             error=cache.get("error"),
         )
+
+    @app.post("/instructions/agents/{agent_name}", status_code=202)
+    async def instructions(agent_name: str, request: InstructionRequest):
+        """Send instructions to agents."""
+        logger.info(f"Sending instructions to agent {agent_name}.")
+        app.state.actor_manager.instruct(agent_name, request.instruction)
+        return Response(status_code=202)
 
     @app.get("/health")
     async def health_check():

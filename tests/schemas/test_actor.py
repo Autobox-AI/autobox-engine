@@ -1,14 +1,10 @@
 """Test suite for actor schemas."""
 
-import pytest
 from unittest.mock import Mock
+
 from thespian.actors import ActorAddress
 
-from autobox.schemas.actor import (
-    ActorName,
-    ActorStatus,
-    Actor,
-)
+from autobox.schemas.actor import Actor, ActorName, ActorStatus
 
 
 class TestActorNameEnum:
@@ -50,12 +46,19 @@ class TestActorStatusEnum:
 
     def test_actor_status_transitions(self):
         """Test common status transitions."""
-        # This is more of a documentation test
-        # showing expected status transitions
         valid_transitions = {
             ActorStatus.NOT_INITIALIZED: [ActorStatus.INITIALIZED, ActorStatus.ERROR],
-            ActorStatus.INITIALIZED: [ActorStatus.RUNNING, ActorStatus.ERROR, ActorStatus.STOPPED],
-            ActorStatus.RUNNING: [ActorStatus.COMPLETED, ActorStatus.ERROR, ActorStatus.ABORTED, ActorStatus.STOPPED],
+            ActorStatus.INITIALIZED: [
+                ActorStatus.RUNNING,
+                ActorStatus.ERROR,
+                ActorStatus.STOPPED,
+            ],
+            ActorStatus.RUNNING: [
+                ActorStatus.COMPLETED,
+                ActorStatus.ERROR,
+                ActorStatus.ABORTED,
+                ActorStatus.STOPPED,
+            ],
             ActorStatus.COMPLETED: [ActorStatus.STOPPED],
             ActorStatus.ERROR: [ActorStatus.STOPPED, ActorStatus.FAILED],
             ActorStatus.ABORTED: [ActorStatus.STOPPED],
@@ -63,8 +66,7 @@ class TestActorStatusEnum:
             ActorStatus.FAILED: [],
             ActorStatus.UNKNOWN: [ActorStatus.ERROR, ActorStatus.STOPPED],
         }
-        
-        # Just verify the dictionary is defined correctly
+
         assert len(valid_transitions) == 9
         assert all(isinstance(v, list) for v in valid_transitions.values())
 
@@ -76,33 +78,30 @@ class TestActor:
         """Test creating an actor with an address."""
         mock_address = Mock(spec=ActorAddress)
         actor = Actor(address=mock_address)
-        
+
         assert actor.address == mock_address
 
     def test_actor_creation_without_address(self):
         """Test creating an actor without an address."""
         actor = Actor()
-        
+
         assert actor.address is None
 
     def test_actor_with_arbitrary_types(self):
         """Test that Actor allows arbitrary types (like ActorAddress)."""
-        # This should work because of ConfigDict(arbitrary_types_allowed=True)
-        mock_address = Mock(spec=ActorAddress)  # Mock with ActorAddress spec
+        mock_address = Mock(spec=ActorAddress)
         actor = Actor(address=mock_address)
-        
+
         assert actor.address == mock_address
 
     def test_actor_json_serialization_without_address(self):
         """Test JSON serialization of actor without address."""
         actor = Actor()
-        
-        # Should be able to dump to dict
+
         data = actor.model_dump()
         assert "address" in data
         assert data["address"] is None
 
     def test_actor_model_config(self):
         """Test that Actor has the correct model configuration."""
-        # Verify that arbitrary_types_allowed is set
         assert Actor.model_config.get("arbitrary_types_allowed") is True

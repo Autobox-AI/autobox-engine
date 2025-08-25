@@ -20,6 +20,7 @@ from autobox.schemas.message import (
     InitEvaluator,
     InitPlanner,
     InitReporter,
+    InstructionMessage,
     Message,
     Signal,
     SignalMessage,
@@ -34,10 +35,7 @@ from autobox.schemas.simulation import SimulationStatus
 class Orchestrator(BaseAgent):
     def __init__(self):
         super().__init__()
-        self.planner = None
-        self.evaluator = None
-        self.reporter = None
-        self.workers = {}
+        self.addresses = {}
         self.is_completed = False
         self.simulation_progress = 0
         self.simulation_summary = None
@@ -63,7 +61,7 @@ class Orchestrator(BaseAgent):
                 self.logger.info("Orchestrator starting...")
 
                 self.send(
-                    self.planner,
+                    self.addresses["planner"],
                     SignalMessage(
                         from_agent=self.name,
                         to_agent=ActorName.PLANNER,
@@ -96,6 +94,18 @@ class Orchestrator(BaseAgent):
                 self.logger.info(
                     f"Orchestrator received unknown message from {message.from_agent}: {message}"
                 )
+        elif isinstance(message, InstructionMessage):
+            self.send(
+                self.addresses[message.agent_name],
+                Message(
+                    from_agent=self.name,
+                    to_agent=message.agent_name,
+                    content=message.content,
+                ),
+            )
+            self.logger.info(
+                f"Orchestrator received instruction from {message.agent_name}: {message.content}"
+            )
         elif isinstance(message, Message):
             self.memory.add_message(message)
 
@@ -123,7 +133,7 @@ class Orchestrator(BaseAgent):
                 if planner_output.status == SimulationStatus.COMPLETED:
                     self.simulation_status = SimulationStatus.SUMMARIZING
                     self.send(
-                        self.reporter,
+                        self.addresses["reporter"],
                         Message(
                             from_agent=self.name,
                             to_agent=ActorName.REPORTER,
@@ -138,7 +148,7 @@ class Orchestrator(BaseAgent):
 
                 for instruction in planner_output.instructions:
                     self.send(
-                        self.workers[instruction.agent_name],
+                        self.addresses[instruction.agent_name],
                         Message(
                             from_agent=self.name,
                             to_agent=instruction.agent_name,
@@ -155,7 +165,7 @@ class Orchestrator(BaseAgent):
                     return
 
                 self.send(
-                    self.planner,
+                    self.addresses["planner"],
                     Message(
                         from_agent=self.name,
                         to_agent=ActorName.PLANNER,
@@ -176,7 +186,7 @@ class Orchestrator(BaseAgent):
         self.logger.info("Orchestrator stopped all agents")
 
     def handle_init(self, sender: ActorAddress, message: Init):
-        self.id = message.agent_ids["orchestrator"]
+        self.id = message.agent_ids_by_name["orchestrator"]
         self.simulation_id = self.id
         self.simulation_status = SimulationStatus.NEW
 
@@ -209,9 +219,15 @@ class Orchestrator(BaseAgent):
         self.planner = self.createActor(Planner, globalName="planner")
         self.evaluator = self.createActor(Evaluator, globalName="evaluator")
         self.reporter = self.createActor(Reporter, globalName="reporter")
-        self.workers = {
+        worker_actor_addresses_by_name = {
             worker.name: self.createActor(Worker, globalName=worker.name)
             for worker in message.config.simulation.workers
+        }
+        self.addresses = {
+            "planner": self.planner,
+            "evaluator": self.evaluator,
+            "reporter": self.reporter,
+            **worker_actor_addresses_by_name,
         }
         workers_info = json.dumps(
             [
@@ -229,7 +245,7 @@ class Orchestrator(BaseAgent):
             InitPlanner(
                 task=message.config.simulation.task,
                 config=message.config.simulation.planner,
-                id=message.agent_ids["planner"],
+                id=message.agent_ids_by_name["planner"],
                 workers_info=workers_info,
             ),
         )
@@ -238,7 +254,7 @@ class Orchestrator(BaseAgent):
             InitEvaluator(
                 task=message.config.simulation.task,
                 config=message.config.simulation.evaluator,
-                id=message.agent_ids["evaluator"],
+                id=message.agent_ids_by_name["evaluator"],
                 workers_info=workers_info,
                 metrics_definitions=metrics_definitions,
             ),
@@ -248,17 +264,17 @@ class Orchestrator(BaseAgent):
             InitReporter(
                 task=message.config.simulation.task,
                 config=message.config.simulation.reporter,
-                id=message.agent_ids["reporter"],
+                id=message.agent_ids_by_name["reporter"],
                 workers_info=workers_info,
             ),
         )
-        for worker_name, worker_actor in self.workers.items():
+        for worker_name, worker_actor in worker_actor_addresses_by_name.items():
             self.send(
                 worker_actor,
                 InitAgent(
                     task=message.config.simulation.task,
                     config=worker_configs_by_name[worker_name],
-                    id=message.agent_ids[worker_name],
+                    id=message.agent_ids_by_name[worker_name],
                 ),
             )
 

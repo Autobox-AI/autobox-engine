@@ -6,7 +6,14 @@ from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.planner import prompt as system_prompt
 from autobox.schemas.actor import ActorName, ActorStatus
-from autobox.schemas.message import Ack, InitPlanner, Message, Signal, SignalMessage
+from autobox.schemas.message import (
+    Ack,
+    InitPlanner,
+    InstructionMessage,
+    Message,
+    Signal,
+    SignalMessage,
+)
 from autobox.schemas.planner import PlannerOutput
 
 
@@ -42,6 +49,9 @@ class Planner(BaseAgent):
                 self.send(self.myAddress, ActorExitRequest())
                 self.status = ActorStatus.STOPPED
                 self.logger.info("Planner stopped")
+        elif isinstance(message, InstructionMessage):
+            self.instruction = message.content
+            self.logger.info(f"Planner received instruction: {message.content}")
         elif isinstance(message, Message):
             self.memory.add_message(message)
             self.plan(sender, message.content)
@@ -66,10 +76,10 @@ class Planner(BaseAgent):
                 "role": "user",
                 "content": f"CONVERSATION HISTORY: {content}",
             },
-            # {
-            #     "role": "user",
-            #     "content": "USER INSTRUCTIONS: ",  # TODO
-            # },
+            {
+                "role": "user",
+                "content": f"HUMAN USER INSTRUCTIONS: {self.instruction}",
+            },
         ]
 
         completion = self.llm.think(chat_completion_messages, schema=PlannerOutput)

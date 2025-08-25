@@ -2,19 +2,25 @@ from typing import Any
 
 from thespian.actors import ActorSystem
 
+from autobox.core.agents.orchestrator import Orchestrator
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.message import SimulationSignal
+from autobox.schemas.actor import Actor, ActorName
+from autobox.schemas.message import InstructionMessage, SimulationSignal
+
+STATUS_CHECK_TIMEOUT_SECONDS = 5
 
 
 class ActorManager:
-    def __init__(self, system: ActorSystem, orchestrator_actor: Any):
-        self.system = system
-        self.orchestrator_actor = orchestrator_actor
+    def __init__(self, agent_ids_by_name: dict):
+        self.system = ActorSystem("multiprocQueueBase")
+        self.orchestrator_actor = Actor(
+            address=self.system.createActor(Orchestrator),
+            name=ActorName.ORCHESTRATOR,
+            id=agent_ids_by_name["orchestrator"],
+        )
         self.logger = LoggerManager.get_server_logger()
         self._is_alive = True
         self.simulation_id = None
-        if hasattr(orchestrator_actor, "simulation_id"):
-            self.simulation_id = orchestrator_actor.simulation_id
 
     def is_actor_alive(self) -> bool:
         """Check if the orchestrator actor is still alive by sending a lightweight probe."""
@@ -48,14 +54,25 @@ class ActorManager:
             self._is_alive = False
             raise
 
+    def ask(self, message: Any) -> Any:
+        return self.system.ask(
+            self.orchestrator_actor.address,
+            message,
+            timeout=STATUS_CHECK_TIMEOUT_SECONDS,
+        )
 
-def create_actor(system: ActorSystem, actor_class: type, name: str, id: str) -> Any:
-    """Create an actor instance with the given class and configuration."""
-    from autobox.schemas.actor import Actor
-    
-    actor_address = system.createActor(actor_class)
-    return Actor(
-        address=actor_address,
-        name=name,
-        id=id,
-    )
+    def instruct(self, agent_name: str, instruction: Any):
+        self.logger.info(f"ActorManager.instruct called for agent '{agent_name}' with instruction: {instruction}")
+        self.system.tell(
+            self.orchestrator_actor.address,
+            InstructionMessage(
+                content=instruction,
+                agent_name=agent_name,
+                from_agent="simulator",
+                to_agent=ActorName.ORCHESTRATOR,
+            ),
+        )
+
+    def instruct_agent(self, actor_class: type, name: str, id: str) -> Any:
+        # return create_actor(self.system, actor_class, name, id)
+        pass

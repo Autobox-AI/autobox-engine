@@ -3,6 +3,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from thespian.actors import ActorAddress
 
 from autobox.config.loader import _load_simulation_config as load_simulation_config
 from autobox.core.simulator import Simulator
@@ -48,8 +49,7 @@ class TestSimulationFlow:
     """Test cases for complete simulation flow."""
 
     @pytest.mark.asyncio
-    @patch("autobox.core.simulator.create_actor")
-    @patch("autobox.core.simulator.ActorSystem")
+    @patch("autobox.actor.manager.ActorSystem")
     @patch("autobox.core.agents.worker.LLM")
     @patch("autobox.core.agents.planner.LLM")
     @patch("autobox.core.agents.reporter.LLM")
@@ -61,34 +61,14 @@ class TestSimulationFlow:
         mock_planner_llm,
         mock_worker_llm,
         mock_actor_system_class,
-        mock_create_actor,
         test_config,
         mock_llm_responses,
     ):
         """Test a simple simulation flow from start to completion."""
-        # Setup mock actor system
         mock_system = Mock()
         mock_actor_system_class.return_value = mock_system
+        mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        # Mock create_actor to return Mock actors
-        mock_actors = {}
-
-        def mock_create_actor_side_effect(system, actor_class, name, id):
-            from autobox.schemas.actor import Actor
-
-            mock_actor = Mock(spec=Actor)
-            mock_actor.address = Mock()
-            mock_actor.name = name
-            mock_actor.id = id
-            mock_actors[name] = mock_actor
-            return mock_actor
-
-        mock_create_actor.side_effect = mock_create_actor_side_effect
-
-        # Mock system.createActor to return mock addresses
-        mock_system.createActor.return_value = Mock()
-
-        # Setup mock LLM responses
         planner_responses = [
             Mock(choices=[Mock(message=Mock(parsed=mock_llm_responses["planner"]))]),
             Mock(
@@ -115,16 +95,10 @@ class TestSimulationFlow:
         )
         mock_reporter_llm.return_value.think.return_value = reporter_response
 
-        # Create config
         config = Config(simulation=test_config, metrics=None)
 
-        # Create simulator
         simulator = Simulator(config)
 
-        # Simulate the flow with mocked ask responses
-        ask_responses = []
-
-        # Helper to track message flow
         message_log = []
 
         def mock_ask(address, message, timeout=None):
@@ -166,18 +140,14 @@ class TestSimulationFlow:
 
         mock_system.ask.side_effect = mock_ask
 
-        # Run simulation with very short timeout for testing
         config.simulation.timeout_seconds = 1
         await simulator.run()
 
-        # Verify message flow
         assert len(message_log) > 0
 
-        # Verify initialization happened
         init_messages = [m for m in message_log if isinstance(m, Init)]
         assert len(init_messages) > 0
 
-        # Verify start signal was sent
         start_messages = [
             m
             for m in message_log
@@ -185,7 +155,6 @@ class TestSimulationFlow:
         ]
         assert len(start_messages) > 0
 
-        # Verify status checks happened
         status_messages = [
             m
             for m in message_log
@@ -193,7 +162,6 @@ class TestSimulationFlow:
         ]
         assert len(status_messages) > 0
 
-        # Verify stop signal was sent
         stop_messages = [
             m
             for m in message_log
@@ -202,30 +170,14 @@ class TestSimulationFlow:
         assert len(stop_messages) > 0
 
     @pytest.mark.asyncio
-    @patch("autobox.core.simulator.create_actor")
-    @patch("autobox.core.simulator.ActorSystem")
-    async def test_simulation_timeout(
-        self, mock_actor_system_class, mock_create_actor, test_config
-    ):
+    @patch("autobox.actor.manager.ActorSystem")
+    async def test_simulation_timeout(self, mock_actor_system_class, test_config):
         """Test that simulation respects timeout."""
         mock_system = Mock()
         mock_actor_system_class.return_value = mock_system
+        mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        # Mock create_actor to return Mock actors
-        def mock_create_actor_side_effect(system, actor_class, name, id):
-            from autobox.schemas.actor import Actor
-
-            mock_actor = Mock(spec=Actor)
-            mock_actor.address = Mock()
-            mock_actor.name = name
-            mock_actor.id = id
-            return mock_actor
-
-        mock_create_actor.side_effect = mock_create_actor_side_effect
-
-        # Always return RUNNING status to trigger timeout
         mock_system.ask.return_value = Mock(status=ActorStatus.RUNNING)
-        mock_system.createActor.return_value = Mock()
 
         config = Config(simulation=test_config, metrics=None)
         config.simulation.timeout_seconds = 0.1  # Very short timeout
@@ -238,10 +190,8 @@ class TestSimulationFlow:
         await simulator.run()
         elapsed = time.time() - start_time
 
-        # Should have stopped due to timeout
-        assert elapsed < 1.0  # Should be close to 0.1 seconds
+        assert elapsed < 1.0
 
-        # Verify stop was called
         stop_calls = [
             call
             for call in mock_system.ask.call_args_list
@@ -252,29 +202,15 @@ class TestSimulationFlow:
         assert len(stop_calls) > 0
 
     @pytest.mark.asyncio
-    @patch("autobox.core.simulator.create_actor")
-    @patch("autobox.core.simulator.ActorSystem")
+    @patch("autobox.actor.manager.ActorSystem")
     async def test_simulation_error_handling(
-        self, mock_actor_system_class, mock_create_actor, test_config
+        self, mock_actor_system_class, test_config
     ):
         """Test simulation handles errors gracefully."""
         mock_system = Mock()
         mock_actor_system_class.return_value = mock_system
+        mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        # Mock create_actor to return Mock actors
-        def mock_create_actor_side_effect(system, actor_class, name, id):
-            from autobox.schemas.actor import Actor
-
-            mock_actor = Mock(spec=Actor)
-            mock_actor.address = Mock()
-            mock_actor.name = name
-            mock_actor.id = id
-            return mock_actor
-
-        mock_create_actor.side_effect = mock_create_actor_side_effect
-        mock_system.createActor.return_value = Mock()
-
-        # Simulate errors in status checks
         def mock_ask_side_effect(address, message, timeout=None):
             if isinstance(message, Init):
                 return Ack(from_agent="orchestrator", to_agent="simulator")
@@ -282,7 +218,6 @@ class TestSimulationFlow:
                 if message.type == Signal.START:
                     return Ack(from_agent="orchestrator", to_agent="simulator")
                 elif message.type == Signal.STATUS:
-                    # Return None to simulate errors
                     return None
                 elif message.type == Signal.STOP:
                     return Status(
@@ -297,41 +232,23 @@ class TestSimulationFlow:
         config = Config(simulation=test_config, metrics=None)
         simulator = Simulator(config)
 
-        # The simulator has a bug where it doesn't handle None status properly
-        # We expect it to fail with AttributeError
         try:
             await simulator.run()
         except AttributeError:
-            # Expected due to the simulator bug with None status
             pass
 
-        # Should have attempted status checks and eventually tried to stop
         assert mock_system.ask.call_count >= 5  # init, start, 3 status checks
 
     @pytest.mark.asyncio
-    @patch("autobox.core.simulator.create_actor")
-    @patch("autobox.core.simulator.ActorSystem")
+    @patch("autobox.actor.manager.ActorSystem")
     async def test_simulation_status_transitions(
-        self, mock_actor_system_class, mock_create_actor, test_config
+        self, mock_actor_system_class, test_config
     ):
         """Test simulation handles status transitions correctly."""
         mock_system = Mock()
         mock_actor_system_class.return_value = mock_system
+        mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        # Mock create_actor to return Mock actors
-        def mock_create_actor_side_effect(system, actor_class, name, id):
-            from autobox.schemas.actor import Actor
-
-            mock_actor = Mock(spec=Actor)
-            mock_actor.address = Mock()
-            mock_actor.name = name
-            mock_actor.id = id
-            return mock_actor
-
-        mock_create_actor.side_effect = mock_create_actor_side_effect
-        mock_system.createActor.return_value = Mock()
-
-        # Simulate status progression
         statuses = [
             ActorStatus.INITIALIZED,
             ActorStatus.RUNNING,
@@ -366,5 +283,4 @@ class TestSimulationFlow:
         simulator = Simulator(config)
         await simulator.run()
 
-        # Verify all status transitions were processed
         assert status_index == len(statuses)

@@ -4,7 +4,7 @@ from typing import List
 from autobox.schemas.config import WorkerConfig
 
 
-def create_ids(workers: List[WorkerConfig]) -> dict:
+def create_ids_by_name(workers: List[WorkerConfig]) -> dict:
     orchestrator_id = str(uuid.uuid4())
     evaluator_id = str(uuid.uuid4())
     planner_id = str(uuid.uuid4())

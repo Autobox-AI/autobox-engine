@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from autobox.schemas.ai import OpenAIModel
 from autobox.schemas.metrics import MetricType
@@ -26,6 +26,13 @@ class AgentConfig(BaseModel):
     instruction: str = None
     llm: LLMConfig
     mailbox: MailboxConfig
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def transform_name(cls, v):
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
 
 class WorkerConfig(AgentConfig):

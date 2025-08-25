@@ -20,11 +20,9 @@ def mock_config():
     config = Mock()
     config.simulation = Mock()
     config.simulation.task = "Test task"
-    # Create real config objects first
     llm_config = LLMConfig(model=OpenAIModel.GPT_4O_MINI)
     mailbox_config = MailboxConfig(max_size=100)
 
-    # Create worker configs with proper attributes
     worker1 = WorkerConfig(
         name="WORKER_1",
         backstory="Backstory 1",
@@ -72,8 +70,8 @@ def mock_config():
 
     def get_worker_configs_by_name():
         return {
-            "WORKER_1": worker1,
-            "WORKER_2": worker2,
+            worker1.name: worker1,
+            worker2.name: worker2,
         }
 
     config.get_worker_configs_by_name = get_worker_configs_by_name
@@ -95,8 +93,8 @@ def agent_ids():
         "planner": "plan-123",
         "evaluator": "eval-123",
         "reporter": "rep-123",
-        "WORKER_1": "work1-123",
-        "WORKER_2": "work2-123",
+        "worker_1": "work1-123",
+        "worker_2": "work2-123",
     }
 
 
@@ -107,10 +105,7 @@ class TestOrchestratorInitialization:
         """Test that an orchestrator is created with correct initial state."""
         assert orchestrator.id is None
         assert orchestrator.name == ActorName.ORCHESTRATOR
-        assert orchestrator.planner is None
-        assert orchestrator.evaluator is None
-        assert orchestrator.reporter is None
-        assert orchestrator.workers == {}
+        assert orchestrator.addresses == {}
         assert orchestrator.is_completed is False
         assert orchestrator.memory is not None
         assert orchestrator.status == ActorStatus.NOT_INITIALIZED
@@ -134,19 +129,17 @@ class TestOrchestratorMessageHandling:
         orchestrator.send = Mock()
         sender = Mock()
 
-        # Mock actor creation
         mock_actors = {
             "planner": Mock(),
             "evaluator": Mock(),
             "reporter": Mock(),
-            "WORKER_1": Mock(),
-            "WORKER_2": Mock(),
+            "worker_1": Mock(),
+            "worker_2": Mock(),
         }
         mock_create_actor.side_effect = lambda cls, globalName: mock_actors.get(
             globalName
         )
 
-        # Mock metrics generation
         mock_metric1 = Mock()
         mock_metric1.name = "metric1"
         mock_metric1.model_dump.return_value = {"name": "metric1", "type": "test"}
@@ -158,34 +151,28 @@ class TestOrchestratorMessageHandling:
         mock_metrics = [mock_metric1, mock_metric2]
         mock_generate_metrics.return_value = mock_metrics
 
-        # Create Init message bypassing validation for testing
         init_msg = Mock(spec=Init)
         init_msg.config = mock_config
-        init_msg.agent_ids = agent_ids
+        init_msg.agent_ids_by_name = agent_ids
         orchestrator.receiveMessage(init_msg, sender)
 
-        # Verify orchestrator state
         assert orchestrator.id == "orch-123"
         assert orchestrator.status == ActorStatus.INITIALIZED
-        assert orchestrator.planner == mock_actors["planner"]
-        assert orchestrator.evaluator == mock_actors["evaluator"]
-        assert orchestrator.reporter == mock_actors["reporter"]
-        assert orchestrator.workers == {
-            "WORKER_1": mock_actors["WORKER_1"],
-            "WORKER_2": mock_actors["WORKER_2"],
-        }
+        assert orchestrator.addresses["planner"] == mock_actors["planner"]
+        assert orchestrator.addresses["evaluator"] == mock_actors["evaluator"]
+        assert orchestrator.addresses["reporter"] == mock_actors["reporter"]
+        assert orchestrator.addresses["worker_1"] == mock_actors["worker_1"]
+        assert orchestrator.addresses["worker_2"] == mock_actors["worker_2"]
 
-        # Verify actors were created
         assert mock_create_actor.call_count == 5
 
-        # Verify initialization messages were sent
         assert (
             orchestrator.send.call_count == 6
         )  # planner, evaluator, reporter, 2 workers, and ack to sender
 
     def test_start_signal(self, orchestrator):
         """Test handling START signal."""
-        orchestrator.planner = Mock()
+        orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
         sender = Mock()
 
@@ -195,13 +182,10 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(start_msg, sender)
 
-        # Verify status is updated
         assert orchestrator.status == ActorStatus.RUNNING
 
-        # Verify plan signal is sent to planner
-        orchestrator.send.assert_any_call(orchestrator.planner, ANY)
+        orchestrator.send.assert_any_call(orchestrator.addresses["planner"], ANY)
 
-        # Verify acknowledgment is sent back
         ack_call = [
             call
             for call in orchestrator.send.call_args_list
@@ -221,7 +205,6 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(status_msg, sender)
 
-        # Verify status response is sent
         orchestrator.send.assert_called_once()
         response = orchestrator.send.call_args[0][1]
         assert isinstance(response, Status)
@@ -230,7 +213,6 @@ class TestOrchestratorMessageHandling:
     def test_stop_signal(self, orchestrator):
         """Test handling STOP signal."""
         orchestrator.send = Mock()
-        # Mock myAddress as a property
         type(orchestrator).myAddress = Mock()
         sender = Mock()
 
@@ -240,13 +222,10 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(stop_msg, sender)
 
-        # Verify ActorExitRequest is sent
         orchestrator.send.assert_any_call(orchestrator.myAddress, ANY)
 
-        # Verify status is updated
         assert orchestrator.status == ActorStatus.STOPPED
 
-        # Verify status response is sent
         status_calls = [
             call
             for call in orchestrator.send.call_args_list
@@ -256,21 +235,20 @@ class TestOrchestratorMessageHandling:
 
     def test_planner_message_with_instructions(self, orchestrator):
         """Test handling message from planner with instructions."""
-        orchestrator.workers = {
-            "WORKER_1": Mock(),
-            "WORKER_2": Mock(),
+        orchestrator.addresses = {
+            "worker_1": Mock(),
+            "worker_2": Mock(),
         }
         orchestrator.send = Mock()
         sender = Mock()
 
-        # Create planner output
         planner_output = PlannerOutput(
             thinking_process="Planning complete",
             status=SimulationStatus.IN_PROGRESS,
             progress=50.0,
             instructions=[
-                Instruction(agent_name="WORKER_1", instruction="Do task 1"),
-                Instruction(agent_name="WORKER_2", instruction="Do task 2"),
+                Instruction(agent_name="worker_1", instruction="Do task 1"),
+                Instruction(agent_name="worker_2", instruction="Do task 2"),
             ],
         )
 
@@ -282,33 +260,28 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        # Verify message is added to memory
         assert len(orchestrator.memory.history) == 1
 
-        # Verify instructions are sent to workers
         assert orchestrator.send.call_count == 2
 
-        # Check first worker message
         call1 = orchestrator.send.call_args_list[0]
-        assert call1[0][0] == orchestrator.workers["WORKER_1"]
+        assert call1[0][0] == orchestrator.addresses["worker_1"]
         msg1 = call1[0][1]
         assert isinstance(msg1, Message)
         assert msg1.content == "Do task 1"
 
-        # Check second worker message
         call2 = orchestrator.send.call_args_list[1]
-        assert call2[0][0] == orchestrator.workers["WORKER_2"]
+        assert call2[0][0] == orchestrator.addresses["worker_2"]
         msg2 = call2[0][1]
         assert isinstance(msg2, Message)
         assert msg2.content == "Do task 2"
 
-        # Verify pending agents are tracked
-        assert "WORKER_1" in orchestrator.memory.pending
-        assert "WORKER_2" in orchestrator.memory.pending
+        assert "worker_1" in orchestrator.memory.pending
+        assert "worker_2" in orchestrator.memory.pending
 
     def test_planner_message_completed(self, orchestrator):
         """Test handling planner message with COMPLETED status."""
-        orchestrator.reporter = Mock()
+        orchestrator.addresses = {"reporter": Mock()}
         orchestrator.send = Mock()
         orchestrator.memory.add_message(
             Message(from_agent="WORKER_1", to_agent="orchestrator", content="Work done")
@@ -330,10 +303,10 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        # Verify reporter is triggered
-        orchestrator.send.assert_called_once_with(orchestrator.reporter, ANY)
+        orchestrator.send.assert_called_once_with(
+            orchestrator.addresses["reporter"], ANY
+        )
 
-        # Verify reporter is marked as pending
         assert "reporter" in orchestrator.memory.pending
 
     def test_reporter_message(self, orchestrator):
@@ -349,15 +322,13 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        # Verify status is marked as completed
         assert orchestrator.status == ActorStatus.COMPLETED
 
-        # Verify message is added to memory
         assert len(orchestrator.memory.history) == 1
 
     def test_worker_message_triggers_planner(self, orchestrator):
         """Test that worker message triggers planner when no pending agents."""
-        orchestrator.planner = Mock()
+        orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
         orchestrator.memory.pending = []  # No pending agents
         sender = Mock()
@@ -370,15 +341,15 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        # Verify message is added to memory
         assert len(orchestrator.memory.history) == 1
 
-        # Verify planner is triggered
-        orchestrator.send.assert_called_once_with(orchestrator.planner, ANY)
+        orchestrator.send.assert_called_once_with(
+            orchestrator.addresses["planner"], ANY
+        )
 
     def test_worker_message_with_pending_agents(self, orchestrator):
         """Test that worker message doesn't trigger planner when agents are pending."""
-        orchestrator.planner = Mock()
+        orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
         orchestrator.memory.pending = ["WORKER_2"]  # WORKER_2 is still pending
         sender = Mock()
@@ -391,10 +362,8 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        # Verify message is added to memory
         assert len(orchestrator.memory.history) == 1
 
-        # Verify planner is NOT triggered
         orchestrator.send.assert_not_called()
 
     def test_unknown_signal(self, orchestrator):

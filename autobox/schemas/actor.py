@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from thespian.actors import ActorAddress
@@ -11,6 +10,8 @@ class ActorName(str, Enum):
     EVALUATOR = "evaluator"
     REPORTER = "reporter"
     WORKER = "worker"
+    SERVER = "server"
+    SIMULATOR = "simulator"
 
 
 class ActorStatus(str, Enum):
@@ -27,7 +28,7 @@ class ActorStatus(str, Enum):
 
 class Actor(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
+
     address: ActorAddress = Field(default=None)
     name: str = Field(default=None)
     id: str = Field(default=None)

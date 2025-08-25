@@ -23,17 +23,20 @@ class Signal(str, Enum):
     SIMULATION = "simulation"
 
 
-class SignalMessage(BaseModel):
-    type: Signal = Field(default=None)
+class BaseMessage(BaseModel):
     from_agent: str = Field(default=None)
     to_agent: str = Field(default=None)
+
+
+class SignalMessage(BaseMessage):
+    type: Signal = Field(default=None)
     content: Optional[str] = Field(default=None)
 
 
 class SimulationSignal(SignalMessage):
     type: Signal = Signal.SIMULATION
     to_agent: str = ActorName.ORCHESTRATOR
-    from_agent: str = "server"
+    from_agent: str = ActorName.SERVER
 
     @field_validator("type", mode="before")
     @classmethod
@@ -48,7 +51,7 @@ class SimulationSignal(SignalMessage):
     @field_validator("from_agent", mode="before")
     @classmethod
     def set_from_agent(cls, v):
-        return "server"
+        return ActorName.SERVER
 
 
 class Ack(SignalMessage):
@@ -60,15 +63,17 @@ class Ack(SignalMessage):
         return Signal.ACKED
 
 
-class Message(BaseModel):
+class Message(BaseMessage):
     content: str = Field(default=None)
-    from_agent: str = Field(default=None)
-    to_agent: str = Field(default=None)
 
 
 class SimulationMessage(Message):
     status: SimulationStatus
     progress: int
+
+
+class InstructionMessage(Message):
+    agent_name: str
 
 
 class Status(SignalMessage):
@@ -83,7 +88,7 @@ class Status(SignalMessage):
 
 class Init(BaseModel):
     config: Config
-    agent_ids: Dict[str, str]
+    agent_ids_by_name: Dict[str, str]
 
 
 class InitAgent(BaseModel):

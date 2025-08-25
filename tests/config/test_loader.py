@@ -12,25 +12,21 @@ def test_loader():
 
     print(config)
 
-    # Assert configuration loaded correctly
     assert config.name == "Test Simulation"
     assert config.max_steps == 150
     assert config.timeout_seconds == 300
     assert config.task == "Test task for simulation"
 
-    # Check workers
     assert len(config.workers) == 2
     worker_names = [worker.name for worker in config.workers]
-    assert "WORKER_1" in worker_names
-    assert "WORKER_2" in worker_names
+    assert "worker_1" in worker_names
+    assert "worker_2" in worker_names
 
-    # Check other components
-    assert config.orchestrator.name == "ORCHESTRATOR"
-    assert config.evaluator.name == "EVALUATOR"
-    assert config.reporter.name == "REPORTER"
-    assert config.planner.name == "PLANNER"
+    assert config.orchestrator.name == "orchestrator"
+    assert config.evaluator.name == "evaluator"
+    assert config.reporter.name == "reporter"
+    assert config.planner.name == "planner"
 
-    # Check logging config
     assert not config.logging.verbose
     assert config.logging.log_path is None
 

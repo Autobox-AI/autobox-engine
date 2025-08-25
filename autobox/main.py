@@ -90,7 +90,7 @@ async def main():
 
     simulator = Simulator(config=config)
 
-    simulation_id = simulator.agent_ids.get("orchestrator", "unknown")
+    simulation_id = simulator.agent_ids_by_name.get("orchestrator", "unknown")
     app_logger.info("=" * 60)
     app_logger.info("🚀 SIMULATION STARTING")
     app_logger.info(f"📝 SIMULATION ID: {simulation_id}")
