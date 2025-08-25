@@ -9,7 +9,14 @@ from autobox.core.agents.orchestrator import Orchestrator
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.ai import OpenAIModel
 from autobox.schemas.config import AgentConfig, LLMConfig, MailboxConfig, WorkerConfig
-from autobox.schemas.message import Ack, Init, Message, Signal, SignalMessage, Status
+from autobox.schemas.message import (
+    Ack,
+    InitOrchestrator,
+    Message,
+    Signal,
+    SignalMessage,
+    Status,
+)
 from autobox.schemas.planner import Instruction, PlannerOutput
 from autobox.schemas.simulation import SimulationStatus
 
@@ -151,7 +158,7 @@ class TestOrchestratorMessageHandling:
         mock_metrics = [mock_metric1, mock_metric2]
         mock_generate_metrics.return_value = mock_metrics
 
-        init_msg = Mock(spec=Init)
+        init_msg = Mock(spec=InitOrchestrator)
         init_msg.config = mock_config
         init_msg.agent_ids_by_name = agent_ids
         orchestrator.receiveMessage(init_msg, sender)

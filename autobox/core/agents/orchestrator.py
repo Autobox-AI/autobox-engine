@@ -15,9 +15,9 @@ from autobox.core.agents.worker import Worker
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     Ack,
-    Init,
     InitAgent,
     InitEvaluator,
+    InitOrchestrator,
     InitPlanner,
     InitReporter,
     InstructionMessage,
@@ -43,7 +43,7 @@ class Orchestrator(BaseAgent):
         self.name: str = ActorName.ORCHESTRATOR
 
     def receiveMessage(self, message, sender):
-        if isinstance(message, Init):
+        if isinstance(message, InitOrchestrator):
             self.handle_init(sender, message)
         elif isinstance(message, SimulationSignal):
             self.send(
@@ -185,7 +185,7 @@ class Orchestrator(BaseAgent):
         self.status = ActorStatus.STOPPED
         self.logger.info("Orchestrator stopped all agents")
 
-    def handle_init(self, sender: ActorAddress, message: Init):
+    def handle_init(self, sender: ActorAddress, message: InitOrchestrator):
         self.id = message.agent_ids_by_name["orchestrator"]
         self.simulation_id = self.id
         self.simulation_status = SimulationStatus.NEW

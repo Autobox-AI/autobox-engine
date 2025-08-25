@@ -86,7 +86,7 @@ class Status(SignalMessage):
         return Signal.STATUS
 
 
-class Init(BaseModel):
+class InitOrchestrator(BaseModel):
     config: Config
     agent_ids_by_name: Dict[str, str]
 

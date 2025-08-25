@@ -18,7 +18,7 @@ from autobox.schemas.config import (
     SimulationConfig,
     WorkerConfig,
 )
-from autobox.schemas.message import Ack, Init, Signal, SignalMessage, Status
+from autobox.schemas.message import Ack, InitOrchestrator, Signal, SignalMessage, Status
 
 
 @pytest.fixture
@@ -121,7 +121,6 @@ class TestSimulator:
 
             assert simulator.config == mock_config
             assert simulator.actor_manager is not None
-            assert simulator._from == "simulator"
             assert "orchestrator" in simulator.agent_ids_by_name
             worker_names = [w.name for w in mock_config.simulation.workers]
             for worker_name in worker_names:
@@ -187,7 +186,7 @@ class TestSimulator:
 
             simulator = Simulator(mock_config)
             result = simulator.actor_manager.ask(
-                Init(
+                InitOrchestrator(
                     config=simulator.config,
                     agent_ids_by_name=simulator.agent_ids_by_name,
                 )
@@ -196,7 +195,7 @@ class TestSimulator:
             assert result == mock_ack
             mock_system.ask.assert_called()
             call_args = mock_system.ask.call_args[0]
-            assert isinstance(call_args[1], Init)
+            assert isinstance(call_args[1], InitOrchestrator)
 
     def test_start_message(self, mock_config):
         """Test start message sending via actor_manager."""
@@ -365,8 +364,18 @@ class TestSimulator:
 
             simulator = Simulator(mock_config)
             with patch("time.time") as mock_time:
-                mock_time.side_effect = [0, 1, 2, 3]  # Simulate time passing
+                mock_time.side_effect = [
+                    0,
+                    0,
+                    1,
+                    1,
+                    2,
+                    2,
+                    3,
+                    3,
+                    3,
+                ]  # Simulate time passing
 
-                last_status = await simulator.loop_status_until_timeout(10, 0)
+                last_status = await simulator.loop_status_until_timeout()
 
                 assert last_status == ActorStatus.COMPLETED

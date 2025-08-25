@@ -9,7 +9,7 @@ from autobox.config.loader import _load_simulation_config as load_simulation_con
 from autobox.core.simulator import Simulator
 from autobox.schemas.actor import ActorStatus
 from autobox.schemas.config import Config
-from autobox.schemas.message import Ack, Init, Signal, SignalMessage, Status
+from autobox.schemas.message import Ack, InitOrchestrator, Signal, SignalMessage, Status
 from autobox.schemas.planner import Instruction, PlannerOutput
 from autobox.schemas.simulation import SimulationStatus
 
@@ -105,7 +105,7 @@ class TestSimulationFlow:
             message_log.append(message)
 
             # Simulate different responses based on message type
-            if isinstance(message, Init):
+            if isinstance(message, InitOrchestrator):
                 return Ack(from_agent="orchestrator", to_agent="simulator")
             elif isinstance(message, SignalMessage):
                 if message.type == Signal.START:
@@ -145,7 +145,7 @@ class TestSimulationFlow:
 
         assert len(message_log) > 0
 
-        init_messages = [m for m in message_log if isinstance(m, Init)]
+        init_messages = [m for m in message_log if isinstance(m, InitOrchestrator)]
         assert len(init_messages) > 0
 
         start_messages = [
@@ -212,7 +212,7 @@ class TestSimulationFlow:
         mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
         def mock_ask_side_effect(address, message, timeout=None):
-            if isinstance(message, Init):
+            if isinstance(message, InitOrchestrator):
                 return Ack(from_agent="orchestrator", to_agent="simulator")
             elif isinstance(message, SignalMessage):
                 if message.type == Signal.START:
