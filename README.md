@@ -213,6 +213,38 @@ curl http://localhost:<PORT>/status
 curl http://localhost:<PORT>/health
 ```
 
+### Agent Instructions
+
+The server provides an endpoint to send real-time instructions to running agents:
+
+```bash
+# Send instructions to a specific agent
+curl -X POST http://localhost:<PORT>/instructions/agents/{agent_name} \
+  -H "Content-Type: application/json" \
+  -d '{"instruction": "Focus on budget constraints in your response"}'
+```
+
+**Key Features:**
+- **Dynamic Guidance**: Send instructions to any agent during simulation execution
+- **Non-blocking**: Returns immediately (202 Accepted) while instruction is processed asynchronously  
+- **Agent-Specific**: Target individual agents by name (e.g., `WORKER_1`, `WORKER_2`)
+- **Real-time Control**: Influence agent behavior without restarting the simulation
+
+**Example Use Cases:**
+```bash
+# Guide a travel agent to consider specific preferences
+curl -X POST http://localhost:<PORT>/instructions/agents/TRAVEL_AGENT \
+  -d '{"instruction": "Prioritize eco-friendly destinations"}'
+
+# Direct a negotiator agent's strategy
+curl -X POST http://localhost:<PORT>/instructions/agents/NEGOTIATOR \
+  -d '{"instruction": "Be more assertive in your pricing proposals"}'
+
+# Refocus an analyst agent
+curl -X POST http://localhost:<PORT>/instructions/agents/ANALYST \
+  -d '{"instruction": "Focus on quarterly revenue trends"}'
+```
+
 ### Example: Monitor Running Simulation
 
 ```bash
