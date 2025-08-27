@@ -213,6 +213,27 @@ curl http://localhost:<PORT>/status
 curl http://localhost:<PORT>/health
 ```
 
+### Simulation Control
+
+```bash
+# Abort a running simulation
+curl -X POST http://localhost:<PORT>/status/abort
+```
+
+**Abort Endpoint Features:**
+- **Graceful Shutdown**: Sends ABORT signal to orchestrator which stops all agents cleanly
+- **Immediate Response**: Returns 202 Accepted with status message
+- **Status Update**: Automatically updates simulation status to "aborted"
+- **Safe Operation**: If no simulation is running, returns an error message
+
+**Example Response:**
+```json
+{
+  "status": "success",
+  "message": "Abort signal sent, simulation shutting down"
+}
+```
+
 ### Agent Instructions
 
 The server provides an endpoint to send real-time instructions to running agents:

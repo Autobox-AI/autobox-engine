@@ -12,6 +12,7 @@ class SimulationStatus(str, Enum):
     SUMMARIZING = "summarizing"
     TIMEOUT = "timeout"
     ABORTED = "aborted"
+    STOPPED = "stopped"
     NEW = "new"
 
 

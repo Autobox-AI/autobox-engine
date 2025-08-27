@@ -84,6 +84,10 @@ class Simulator:
                     )
                     break
 
+                if status == ActorStatus.ABORTED:
+                    self.logger.info(f"Simulation aborted after {elapsed_time:.1f}s")
+                    break
+
             except asyncio.TimeoutError:
                 consecutive_errors += 1
                 self.logger.warning(
@@ -144,7 +148,10 @@ class Simulator:
 
     def stop_the_world(self) -> Status:
         response: Status = self._ask_orchestrator(Signal.STOP)
-        self.logger.info(f"Ochestrator stop response: {response.status.value}")
+        if response and hasattr(response, "status"):
+            self.logger.info(f"Orchestrator stop response: {response.status.value}")
+        else:
+            self.logger.info("Orchestrator already stopped or aborted")
         return response
 
     def status(self) -> Status:

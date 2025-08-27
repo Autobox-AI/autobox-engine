@@ -9,7 +9,7 @@ from autobox.core.runner import Runner
 from autobox.core.simulator import Simulator
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.config import ServerConfig
-from autobox.server import create_app
+from autobox.api import create_app
 
 
 async def run_server(

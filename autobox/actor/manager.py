@@ -5,7 +5,12 @@ from thespian.actors import ActorSystem
 from autobox.core.agents.orchestrator import Orchestrator
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.actor import Actor, ActorName
-from autobox.schemas.message import InstructionMessage, SimulationSignal
+from autobox.schemas.message import (
+    InstructionMessage,
+    Signal,
+    SignalMessage,
+    SimulationSignal,
+)
 
 STATUS_CHECK_TIMEOUT_SECONDS = 5
 
@@ -61,18 +66,41 @@ class ActorManager:
             timeout=STATUS_CHECK_TIMEOUT_SECONDS,
         )
 
+    def abort_simulation(self) -> str:
+        """Abort the running simulation by sending ABORT signal to orchestrator.
+
+        Returns:
+            str: Response from orchestrator
+        """
+        if not self.orchestrator_actor:
+            raise RuntimeError("Orchestrator actor not initialized")
+
+        abort_signal = SignalMessage(
+            from_agent=ActorName.SIMULATOR,
+            to_agent=ActorName.ORCHESTRATOR,
+            type=Signal.ABORT,
+        )
+
+        try:
+            response = self.system.ask(
+                self.orchestrator_actor.address, abort_signal, timeout=5
+            )
+            self.logger.info(f"Abort response from orchestrator: {response}")
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to send abort signal: {e}")
+            raise
+
     def instruct(self, agent_name: str, instruction: Any):
-        self.logger.info(f"ActorManager.instruct called for agent '{agent_name}' with instruction: {instruction}")
+        self.logger.info(
+            f"ActorManager.instruct called for agent '{agent_name}' with instruction: {instruction}"
+        )
         self.system.tell(
             self.orchestrator_actor.address,
             InstructionMessage(
                 content=instruction,
                 agent_name=agent_name,
-                from_agent="simulator",
+                from_agent=ActorName.SIMULATOR,
                 to_agent=ActorName.ORCHESTRATOR,
             ),
         )
-
-    def instruct_agent(self, actor_class: type, name: str, id: str) -> Any:
-        # return create_actor(self.system, actor_class, name, id)
-        pass
