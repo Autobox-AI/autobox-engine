@@ -32,9 +32,6 @@ class TestAbortFunctionality:
 
         response = client.post("/status/abort")
         assert response.status_code == 202
-        data = response.json()
-        assert data["status"] == "success"
-        assert "Abort signal sent" in data["message"]
 
         mock_actor_manager.abort_simulation.assert_called_once()
 

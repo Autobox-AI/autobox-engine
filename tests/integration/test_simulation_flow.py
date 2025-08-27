@@ -50,16 +50,10 @@ class TestSimulationFlow:
 
     @pytest.mark.asyncio
     @patch("autobox.actor.manager.ActorSystem")
-    @patch("autobox.core.agents.worker.LLM")
-    @patch("autobox.core.agents.planner.LLM")
-    @patch("autobox.core.agents.reporter.LLM")
-    @patch("autobox.core.agents.evaluator.LLM")
+    @patch("autobox.core.ai.llm.LLM")
     async def test_simple_simulation_flow(
         self,
-        mock_evaluator_llm,
-        mock_reporter_llm,
-        mock_planner_llm,
-        mock_worker_llm,
+        mock_llm_class,
         mock_actor_system_class,
         test_config,
         mock_llm_responses,
@@ -69,31 +63,24 @@ class TestSimulationFlow:
         mock_actor_system_class.return_value = mock_system
         mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        planner_responses = [
+        # Setup LLM mock to handle different agent calls
+        mock_llm = Mock()
+        mock_llm_class.return_value = mock_llm
+        
+        # Create response queue for different agents
+        llm_responses = [
+            # Planner first call
             Mock(choices=[Mock(message=Mock(parsed=mock_llm_responses["planner"]))]),
-            Mock(
-                choices=[
-                    Mock(message=Mock(parsed=mock_llm_responses["planner_complete"]))
-                ]
-            ),
+            # Worker 1 response
+            Mock(choices=[Mock(message=Mock(content=mock_llm_responses["worker_1"]))]),
+            # Worker 2 response  
+            Mock(choices=[Mock(message=Mock(content=mock_llm_responses["worker_2"]))]),
+            # Planner complete call
+            Mock(choices=[Mock(message=Mock(parsed=mock_llm_responses["planner_complete"]))]),
+            # Reporter response
+            Mock(choices=[Mock(message=Mock(content=mock_llm_responses["reporter"]))]),
         ]
-        mock_planner_llm.return_value.think.side_effect = planner_responses
-
-        worker1_response = Mock(
-            choices=[Mock(message=Mock(content=mock_llm_responses["worker_1"]))]
-        )
-        worker2_response = Mock(
-            choices=[Mock(message=Mock(content=mock_llm_responses["worker_2"]))]
-        )
-        mock_worker_llm.return_value.think.side_effect = [
-            worker1_response,
-            worker2_response,
-        ]
-
-        reporter_response = Mock(
-            choices=[Mock(message=Mock(content=mock_llm_responses["reporter"]))]
-        )
-        mock_reporter_llm.return_value.think.return_value = reporter_response
+        mock_llm.think.side_effect = llm_responses
 
         config = Config(simulation=test_config, metrics=None)
 
