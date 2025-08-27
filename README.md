@@ -77,8 +77,16 @@ uv run autobox-safe --config examples/simulations/summer_vacation.json --metrics
 ### Using Shell Scripts
 
 ```bash
-# Run with environment variable and default config
+# Run with default configuration (summer_vacation)
 ./bin/run
+
+# Run with a specific simulation by name
+./bin/run crime_detective
+./bin/run summer_vacation
+
+# Run and exit after completion
+./bin/run-and-exit
+./bin/run-and-exit crime_detective
 
 # Run tests
 ./bin/test

@@ -1,3 +1,28 @@
 #!/usr/bin/env bash
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE
-uv run python -m autobox.main --config examples/simulations/summer_vacation.json --metrics examples/metrics/summer_vacation.json --server examples/server/default.json "$@"
+
+# Default simulation name
+SIMULATION_NAME="summer_vacation"
+
+# Check if a simulation name argument was provided
+if [ $# -ge 1 ] && [[ ! "$1" =~ ^- ]]; then
+    SIMULATION_NAME="$1"
+    shift  # Remove the first argument so remaining args can be passed to the python command
+fi
+
+# Construct paths
+CONFIG_PATH="examples/simulations/${SIMULATION_NAME}.json"
+METRICS_PATH="examples/metrics/${SIMULATION_NAME}.json"
+
+# Check if files exist
+if [ ! -f "$CONFIG_PATH" ]; then
+    echo "Error: Simulation config file not found: $CONFIG_PATH"
+    exit 1
+fi
+
+if [ ! -f "$METRICS_PATH" ]; then
+    echo "Error: Metrics file not found: $METRICS_PATH"
+    exit 1
+fi
+
+uv run python -m autobox.main --config "$CONFIG_PATH" --metrics "$METRICS_PATH" --server examples/server/default.json "$@"

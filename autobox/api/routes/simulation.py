@@ -1,6 +1,6 @@
 """Simulation status and control endpoints."""
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Request, Response, status
 
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.message import Signal, SignalMessage
@@ -64,10 +64,8 @@ async def abort_simulation(request: Request) -> dict:
         cache["error"] = "Simulation aborted by user"
 
         logger.info("Abort signal sent to orchestrator")
-        return {
-            "status": "success",
-            "message": "Abort signal sent, simulation shutting down",
-        }
+
+        return Response(status_code=status.HTTP_202_ACCEPTED)
 
     except Exception as e:
         logger.error(f"Failed to abort simulation: {e}")

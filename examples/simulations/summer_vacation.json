@@ -2,7 +2,7 @@
     "name": "Summer vacation",
     "max_steps": 150,
     "timeout_seconds": 300,
-    "description": "this is a test simulation",
+    "description": "This simulation is about a couple that needs to decide together a destiny for our summer vacation.",
     "task": "Ana and John need to decide together a destiny for our summer vacation.",
     "evaluator": {
         "name": "EVALUATOR",

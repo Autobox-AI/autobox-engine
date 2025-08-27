@@ -47,6 +47,9 @@ class Simulator:
         start_time = time.time()
         last_status = None
         consecutive_errors = 0
+
+        self.logger.info(f"Starting simulation: {self.config.simulation.name}")
+
         while True:
             elapsed_time = time.time() - start_time
 

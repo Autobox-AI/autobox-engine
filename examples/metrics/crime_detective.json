@@ -1,0 +1,117 @@
+[
+    {
+        "name": "investigation_progress",
+        "description": "Tracks the progress of Detective Graves' investigation in solving the crime.",
+        "type": "GAUGE",
+        "unit": "percentage",
+        "tags": [
+            {
+                "tag": "stage",
+                "description": "The current stage of the investigation (e.g., initial inquiry, evidence collection, suspect interrogation)."
+            }
+        ]
+    },
+    {
+        "name": "evidence_collected",
+        "description": "Counts the number of pieces of evidence collected during the investigation.",
+        "type": "COUNTER",
+        "unit": "pieces",
+        "tags": [
+            {
+                "tag": "evidence_type",
+                "description": "Type of evidence collected (e.g., physical, testimonial, digital)."
+            }
+        ]
+    },
+    {
+        "name": "suspect_interaction_frequency",
+        "description": "Monitors how often Detective Graves interacts with each suspect.",
+        "type": "COUNTER",
+        "unit": "interactions",
+        "tags": [
+            {
+                "tag": "suspect_name",
+                "description": "Name of the suspect being interacted with (e.g., Singer, Driver, Banker)."
+            }
+        ]
+    },
+    {
+        "name": "forensic_analysis_time",
+        "description": "Measures the time taken by the forensic pathologist to analyze evidence.",
+        "type": "HISTOGRAM",
+        "unit": "seconds",
+        "tags": [
+            {
+                "tag": "evidence_type",
+                "description": "Type of evidence being analyzed (e.g., fingerprint, DNA, weapon)."
+            }
+        ]
+    },
+    {
+        "name": "suspect_alibi_strength",
+        "description": "Evaluates the strength of each suspect's alibi during the investigation.",
+        "type": "GAUGE",
+        "unit": "score",
+        "tags": [
+            {
+                "tag": "suspect_name",
+                "description": "Name of the suspect being evaluated (e.g., Singer, Driver, Banker)."
+            }
+        ]
+    },
+    {
+        "name": "lead_follow_up_rate",
+        "description": "Tracks the rate at which Detective Graves follows up on leads.",
+        "type": "COUNTER",
+        "unit": "leads",
+        "tags": [
+            {
+                "tag": "lead_status",
+                "description": "Status of the lead (e.g., open, closed, ongoing)."
+            }
+        ]
+    },
+    {
+        "name": "interrogation_effectiveness",
+        "description": "Measures the effectiveness of interrogations in obtaining useful information.",
+        "type": "SUMMARY",
+        "unit": "score",
+        "tags": [
+            {
+                "tag": "suspect_name",
+                "description": "Name of the suspect being interrogated (e.g., Singer, Driver, Banker)."
+            }
+        ]
+    },
+    {
+        "name": "evidence_relevance",
+        "description": "Assesses the relevance of collected evidence to the crime.",
+        "type": "GAUGE",
+        "unit": "score",
+        "tags": [
+            {
+                "tag": "evidence_id",
+                "description": "Unique identifier for each piece of evidence."
+            }
+        ]
+    },
+    {
+        "name": "suspect_motive_strength",
+        "description": "Evaluates the strength of each suspect's motive for committing the crime.",
+        "type": "GAUGE",
+        "unit": "score",
+        "tags": [
+            {
+                "tag": "suspect_name",
+                "description": "Name of the suspect being evaluated (e.g., Singer, Driver, Banker)."
+            }
+        ]
+    },
+    {
+        "name": "case_resolution_time",
+        "description": "Measures the total time taken to solve the crime.",
+        "type": "GAUGE",
+        "unit": "days",
+        "tags": []
+    }
+]
