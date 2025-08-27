@@ -11,7 +11,7 @@ from autobox.schemas.message import (
 
 class Evaluator(BaseAgent):
     def __init__(self):
-        super().__init__(name=ActorName.EVALUATOR)
+        super().__init__(name=ActorName.EVALUATOR.value)
 
     def receiveMessage(self, message, sender):
         self.memory.add_message(message)

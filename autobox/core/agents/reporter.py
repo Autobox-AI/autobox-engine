@@ -12,7 +12,7 @@ from autobox.schemas.message import (
 
 class Reporter(BaseAgent):
     def __init__(self):
-        super().__init__(name=ActorName.REPORTER)
+        super().__init__(name=ActorName.REPORTER.value)
 
     def receiveMessage(self, message, sender):
         if isinstance(message, InitReporter):

@@ -40,7 +40,7 @@ class Orchestrator(BaseAgent):
         self.simulation_progress = 0
         self.simulation_summary = None
         self.simulation_status: SimulationStatus = None
-        self.name: str = ActorName.ORCHESTRATOR
+        self.name: str = ActorName.ORCHESTRATOR.value
 
     def receiveMessage(self, message, sender):
         """Main message handler - delegates to specific handlers based on message type."""

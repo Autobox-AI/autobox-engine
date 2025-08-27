@@ -15,7 +15,7 @@ from autobox.schemas.planner import PlannerOutput
 
 class Planner(BaseAgent):
     def __init__(self):
-        super().__init__(name=ActorName.PLANNER)
+        super().__init__(name=ActorName.PLANNER.value)
 
     def receiveMessage(self, message, sender):
         if isinstance(message, InitPlanner):
@@ -42,7 +42,7 @@ class Planner(BaseAgent):
 
     def plan(self, sender: ActorAddress, user_prompt: str = None):
         """Generate a plan based on the current context."""
-        self.logger.info("Planner is planning...")
+        self.logger.info("Planning...")
 
         chat_completion_messages = [
             {

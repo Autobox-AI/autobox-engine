@@ -1,14 +1,11 @@
 import os
 
-from thespian.actors import ActorExitRequest
-
 from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.worker import prompt as system_prompt
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import WorkerConfig
 from autobox.schemas.message import (
-    Ack,
     InitAgent,
     InstructionMessage,
     Message,
@@ -36,7 +33,7 @@ class Worker(BaseAgent):
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
-    
+
     def _initialize_worker(self, message, sender):
         """Initialize worker with specific configuration."""
         config: WorkerConfig = message.config
@@ -57,7 +54,7 @@ class Worker(BaseAgent):
         self.status = ActorStatus.INITIALIZED
         self._send_ack(sender)
         self.logger.info(f"Worker {self.name} initialized (pid: {os.getpid()})")
-    
+
     def _process_message(self, message, sender):
         """Process incoming message and generate response."""
         self.memory.add_message(message)
