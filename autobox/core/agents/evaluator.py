@@ -1,13 +1,7 @@
-import os
-
-from thespian.actors import ActorExitRequest
-
 from autobox.core.agents.base import BaseAgent
-from autobox.core.ai.llm import LLM
 from autobox.core.prompts.evaluator import prompt as system_prompt
-from autobox.schemas.actor import ActorName, ActorStatus
+from autobox.schemas.actor import ActorName
 from autobox.schemas.message import (
-    Ack,
     InitEvaluator,
     InstructionMessage,
     Signal,
@@ -21,7 +15,7 @@ class Evaluator(BaseAgent):
 
     def receiveMessage(self, message, sender):
         self.memory.add_message(message)
-        
+
         if isinstance(message, InitEvaluator):
             self._initialize_agent(
                 message,

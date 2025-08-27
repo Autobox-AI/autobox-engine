@@ -1,13 +1,9 @@
-import os
-
-from thespian.actors import ActorAddress, ActorExitRequest
+from thespian.actors import ActorAddress
 
 from autobox.core.agents.base import BaseAgent
-from autobox.core.ai.llm import LLM
 from autobox.core.prompts.planner import prompt as system_prompt
-from autobox.schemas.actor import ActorName, ActorStatus
+from autobox.schemas.actor import ActorName
 from autobox.schemas.message import (
-    Ack,
     InitPlanner,
     InstructionMessage,
     Message,
@@ -24,7 +20,7 @@ class Planner(BaseAgent):
     def receiveMessage(self, message, sender):
         if isinstance(message, InitPlanner):
             self._initialize_agent(
-                message, 
+                message,
                 sender,
                 system_prompt,
                 task=message.task,
@@ -47,7 +43,7 @@ class Planner(BaseAgent):
     def plan(self, sender: ActorAddress, user_prompt: str = None):
         """Generate a plan based on the current context."""
         self.logger.info("Planner is planning...")
-        
+
         chat_completion_messages = [
             {
                 "role": "user",
@@ -63,10 +59,8 @@ class Planner(BaseAgent):
             },
         ]
 
-        completion = self.llm.think(
-            chat_completion_messages, schema=PlannerOutput
-        )
-        
+        completion = self.llm.think(chat_completion_messages, schema=PlannerOutput)
+
         planner_output: PlannerOutput = completion.choices[0].message.parsed
         self.logger.info(f"Planning: {planner_output.thinking_process}")
 

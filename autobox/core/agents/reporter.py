@@ -1,13 +1,7 @@
-import os
-
-from thespian.actors import ActorExitRequest
-
 from autobox.core.agents.base import BaseAgent
-from autobox.core.ai.llm import LLM
 from autobox.core.prompts.reporter import prompt as system_prompt
-from autobox.schemas.actor import ActorName, ActorStatus
+from autobox.schemas.actor import ActorName
 from autobox.schemas.message import (
-    Ack,
     InitReporter,
     InstructionMessage,
     Message,
@@ -39,12 +33,12 @@ class Reporter(BaseAgent):
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
-    
+
     def _generate_report(self, message, sender):
         """Generate a report based on conversation history."""
         self.logger.info("Reporter is summarizing...")
         self.memory.add_message(message)
-        
+
         chat_completion_messages = [
             {
                 "role": "user",

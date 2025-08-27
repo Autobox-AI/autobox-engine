@@ -12,7 +12,7 @@ from autobox.schemas.message import Ack, Signal, SignalMessage
 
 class BaseAgent(Actor, ABC):
     """Base class for all agents with common initialization and message handling."""
-    
+
     def __init__(self, name: str = None):
         super().__init__()
         self.id: str = None
@@ -23,29 +23,31 @@ class BaseAgent(Actor, ABC):
         self.memory = Memory()
         self.logger = LoggerManager.get_runner_logger()
         self.status: ActorStatus = ActorStatus.NOT_INITIALIZED
-    
+
     def _initialize_agent(self, message, sender, system_prompt_func, **prompt_kwargs):
         """Common initialization logic for all agents."""
         self.id = message.id
         self.llm = LLM(
             system_prompt=system_prompt_func(**prompt_kwargs),
-            model=message.config.llm.model if hasattr(message, 'config') else message.llm.model,
+            model=message.config.llm.model
+            if hasattr(message, "config")
+            else message.llm.model,
         )
         self.status = ActorStatus.INITIALIZED
         self._send_ack(sender)
         self.logger.info(f"{self.name} initialized (pid: {os.getpid()})")
-    
+
     def _handle_stop_signal(self):
         """Common stop signal handling."""
         self.send(self.myAddress, ActorExitRequest())
         self.status = ActorStatus.STOPPED
         self.logger.info(f"{self.name} stopped")
-    
+
     def _handle_instruction(self, message):
         """Common instruction message handling."""
         self.instruction = message.content
         self.logger.info(f"{self.name} received instruction: {message.content}")
-    
+
     def _send_ack(self, sender, content="initialized"):
         """Send acknowledgment message."""
         self.send(
@@ -56,7 +58,7 @@ class BaseAgent(Actor, ABC):
                 content=content,
             ),
         )
-    
+
     def _send_unknown_signal(self, sender):
         """Send unknown signal message."""
         self.send(
@@ -67,11 +69,11 @@ class BaseAgent(Actor, ABC):
                 type=Signal.UNKNOWN,
             ),
         )
-    
+
     def _log_unknown_message(self, message):
         """Log unknown message."""
         self.logger.info(f"{self.name} received unknown message: {message}")
-    
+
     @abstractmethod
     def receiveMessage(self, message, sender):
         """Must be implemented by subclasses."""
