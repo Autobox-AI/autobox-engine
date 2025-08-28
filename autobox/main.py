@@ -2,19 +2,19 @@ import asyncio
 
 import uvicorn
 
-from autobox.actor.manager import ActorManager
+from autobox.api import create_app
 from autobox.config.cli import parse_args
 from autobox.config.loader import load_config
 from autobox.core.runner import Runner
 from autobox.core.simulator import Simulator
+from autobox.core.status_manager import StatusManager
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.config import ServerConfig
-from autobox.api import create_app
 
 
 async def run_server(
     config: ServerConfig,
-    actor_manager: ActorManager,
+    status_manager: StatusManager,
     shutdown_event: asyncio.Event = None,
 ):
     """Run the FastAPI server asynchronously with graceful shutdown support."""
@@ -30,7 +30,7 @@ async def run_server(
     server_logger.info(f"Starting server on {config.host}:{config.port}")
 
     uvicorn_config = uvicorn.Config(
-        app=create_app(actor_manager),
+        app=create_app(status_manager),
         host=config.host,
         port=config.port,
         log_level="warning",
@@ -103,7 +103,7 @@ async def main():
     shutdown_event = asyncio.Event()
 
     server_task = asyncio.create_task(
-        run_server(config.server, simulator.actor_manager, shutdown_event)
+        run_server(config.server, simulator.status_manager, shutdown_event)
     )
     runner_task = asyncio.create_task(runner.run())
 

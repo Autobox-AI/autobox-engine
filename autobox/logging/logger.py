@@ -38,7 +38,7 @@ class Logger:
 
         self._logger = logging.getLogger(self.name)
         self._logger.setLevel(logging.DEBUG if verbose else logging.INFO)
-        self._logger.propagate = False  # Prevents duplicate logging
+        self._logger.propagate = False
         self._logger.handlers.clear()
 
         fmt = logging.Formatter(

@@ -9,7 +9,6 @@ from autobox.api import create_app
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.config import ServerConfig
 
-# Module-level variable to pass actor manager to the factory
 _actor_manager = None
 
 
@@ -59,10 +58,9 @@ def start_server(config: ServerConfig, actor_manager: ActorManager = None):
                 app_factory,
                 host=config.host,
                 port=config.port,
-                reload=False,  # Can't use reload with custom factory
+                reload=False,
             )
         else:
-            # Without actor manager, use the standard factory pattern
             uvicorn.run(
                 "autobox.api:create_app",
                 host=config.host,

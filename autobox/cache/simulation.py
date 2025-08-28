@@ -18,13 +18,6 @@ class SimulationCache(BaseModel):
     def get(self):
         return self.simulation
 
-    # async def get_simulation_metrics(self, simulation_id: str):
-    #     async with self._lock:
-    #         simulation_status = self.simulations.get(simulation_id, None)
-    #         if simulation_status is not None:
-    #             return simulation_status.metrics
-    #     return None
-
     def update_status(
         self,
         status: SimulationStatus,

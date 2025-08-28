@@ -24,11 +24,9 @@ from autobox.schemas.message import Ack, InitOrchestrator, Signal, SignalMessage
 @pytest.fixture
 def mock_config():
     """Create a mock configuration for testing."""
-    # Create LLM and mailbox configs
     llm_config = LLMConfig(model=OpenAIModel.GPT_4O_MINI)
     mailbox_config = MailboxConfig(max_size=100)
 
-    # Create agent configs
     orchestrator_config = AgentConfig(
         name="ORCHESTRATOR",
         instruction="Orchestrate",
@@ -45,7 +43,6 @@ def mock_config():
         name="PLANNER", instruction="Plan", llm=llm_config, mailbox=mailbox_config
     )
 
-    # Create worker configs
     worker1 = WorkerConfig(
         name="WORKER_1",
         backstory="Test worker 1",
@@ -63,7 +60,6 @@ def mock_config():
         mailbox=mailbox_config,
     )
 
-    # Create simulation config
     simulation_config = SimulationConfig(
         name="Test Simulation",
         max_steps=10,
@@ -78,7 +74,6 @@ def mock_config():
         logging=LoggingConfig(verbose=False),
     )
 
-    # Create full config
     config = Config(simulation=simulation_config, metrics=None)
     return config
 
@@ -234,7 +229,7 @@ class TestSimulator:
             assert errors == 1
 
             with pytest.raises(StopSimulationException):
-                simulator.check_status(4, 10.0)  # 5th consecutive error
+                simulator.check_status(4, 10.0)
 
     def test_check_status_with_valid_response(self, mock_config):
         """Test status check with valid response."""
@@ -257,39 +252,44 @@ class TestSimulator:
     async def test_run_successful_completion(self, mock_config):
         """Test successful simulation run."""
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
+            from autobox.schemas.message import SimulationMessage
+            from autobox.schemas.simulation import SimulationStatus
+
             mock_system = Mock()
             MockActorSystem.return_value = mock_system
             mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-            mock_system.ask.side_effect = [
-                Ack(from_agent="orchestrator", to_agent="simulator"),  # init
-                Ack(from_agent="orchestrator", to_agent="simulator"),  # start
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.RUNNING,
-                ),
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.COMPLETED,
-                ),
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.STOPPED,
-                ),
-            ]
+            def mock_ask(address, message, timeout=None):
+                from autobox.schemas.message import SimulationSignal
+
+                if isinstance(message, SimulationSignal):
+                    return SimulationMessage(
+                        status=SimulationStatus.COMPLETED,
+                        progress=100,
+                        summary="Test completed",
+                    )
+                elif hasattr(message, "type"):
+                    if message.type == Signal.START:
+                        return Ack(from_agent="orchestrator", to_agent="simulator")
+                    elif message.type == Signal.STOP:
+                        return Status(
+                            from_agent="orchestrator",
+                            to_agent="simulator",
+                            status=ActorStatus.STOPPED,
+                        )
+                return Ack(from_agent="orchestrator", to_agent="simulator")
+
+            mock_system.ask.side_effect = mock_ask
 
             simulator = Simulator(mock_config)
             await simulator.run()
 
-            assert mock_system.ask.call_count >= 4
+            assert mock_system.ask.call_count >= 3  # init, start, stop
 
     @pytest.mark.asyncio
     async def test_run_with_timeout(self, mock_config):
         """Test simulation run with timeout."""
-        mock_config.simulation.timeout_seconds = 0.1  # Very short timeout
+        mock_config.simulation.timeout_seconds = 0.1
 
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
             mock_system = Mock()
@@ -311,24 +311,40 @@ class TestSimulator:
     async def test_run_with_error_status(self, mock_config):
         """Test simulation run that ends with error."""
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
+            from autobox.schemas.message import SimulationMessage, SimulationSignal
+            from autobox.schemas.simulation import SimulationStatus
+
             mock_system = Mock()
             MockActorSystem.return_value = mock_system
             mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-            mock_system.ask.side_effect = [
-                Ack(from_agent="orchestrator", to_agent="simulator"),  # init
-                Ack(from_agent="orchestrator", to_agent="simulator"),  # start
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.ERROR,
-                ),
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.STOPPED,
-                ),
-            ]
+            error_count = 0
+
+            def mock_ask(address, message, timeout=None):
+                nonlocal error_count
+
+                if isinstance(message, SimulationSignal):
+                    error_count += 1
+                    if error_count <= 3:
+                        return None
+                    else:
+                        return SimulationMessage(
+                            status=SimulationStatus.FAILED,
+                            progress=0,
+                            summary="Test failed",
+                        )
+                elif hasattr(message, "type"):
+                    if message.type == Signal.START:
+                        return Ack(from_agent="orchestrator", to_agent="simulator")
+                    elif message.type == Signal.STOP:
+                        return Status(
+                            from_agent="orchestrator",
+                            to_agent="simulator",
+                            status=ActorStatus.STOPPED,
+                        )
+                return Ack(from_agent="orchestrator", to_agent="simulator")
+
+            mock_system.ask.side_effect = mock_ask
 
             simulator = Simulator(mock_config)
             await simulator.run()
@@ -339,42 +355,64 @@ class TestSimulator:
     async def test_loop_status_until_timeout_with_status_changes(self, mock_config):
         """Test status loop with changing statuses."""
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
+            from autobox.schemas.message import SimulationMessage, SimulationSignal
+            from autobox.schemas.simulation import SimulationStatus
+
             mock_system = Mock()
             MockActorSystem.return_value = mock_system
             mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
             statuses = [
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.INITIALIZED,
+                SimulationMessage(
+                    status=SimulationStatus.NEW, progress=0, summary="Initialized"
                 ),
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.RUNNING,
+                SimulationMessage(
+                    status=SimulationStatus.IN_PROGRESS, progress=50, summary="Running"
                 ),
-                Status(
-                    from_agent="orchestrator",
-                    to_agent="simulator",
-                    status=ActorStatus.COMPLETED,
+                SimulationMessage(
+                    status=SimulationStatus.COMPLETED, progress=100, summary="Completed"
                 ),
             ]
-            mock_system.ask.side_effect = statuses
+
+            status_index = 0
+
+            def mock_ask(address, message, timeout=None):
+                nonlocal status_index
+
+                if isinstance(message, SimulationSignal):
+                    if status_index < len(statuses):
+                        response = statuses[status_index]
+                        status_index += 1
+                        return response
+                    return statuses[-1]
+                elif hasattr(message, "type"):
+                    if message.type == Signal.START:
+                        return Ack(from_agent="orchestrator", to_agent="simulator")
+                    elif message.type == Signal.STOP:
+                        return Status(
+                            from_agent="orchestrator",
+                            to_agent="simulator",
+                            status=ActorStatus.STOPPED,
+                        )
+                return Ack(from_agent="orchestrator", to_agent="simulator")
+
+            mock_system.ask.side_effect = mock_ask
 
             simulator = Simulator(mock_config)
             with patch("time.time") as mock_time:
-                mock_time.side_effect = [
-                    0,
-                    0,
-                    1,
-                    1,
-                    2,
-                    2,
-                    3,
-                    3,
-                    3,
-                ]  # Simulate time passing
+                time_counter = {"value": 0}
+
+                def get_time():
+                    if hasattr(get_time, "call_count"):
+                        get_time.call_count += 1
+                    else:
+                        get_time.call_count = 1
+
+                    if get_time.call_count % 3 == 0:
+                        time_counter["value"] += 1
+                    return time_counter["value"]
+
+                mock_time.side_effect = get_time
 
                 last_status = await simulator.loop_status_until_timeout()
 

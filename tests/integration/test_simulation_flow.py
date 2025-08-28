@@ -63,21 +63,18 @@ class TestSimulationFlow:
         mock_actor_system_class.return_value = mock_system
         mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        # Setup LLM mock to handle different agent calls
         mock_llm = Mock()
         mock_llm_class.return_value = mock_llm
-        
-        # Create response queue for different agents
+
         llm_responses = [
-            # Planner first call
             Mock(choices=[Mock(message=Mock(parsed=mock_llm_responses["planner"]))]),
-            # Worker 1 response
             Mock(choices=[Mock(message=Mock(content=mock_llm_responses["worker_1"]))]),
-            # Worker 2 response  
             Mock(choices=[Mock(message=Mock(content=mock_llm_responses["worker_2"]))]),
-            # Planner complete call
-            Mock(choices=[Mock(message=Mock(parsed=mock_llm_responses["planner_complete"]))]),
-            # Reporter response
+            Mock(
+                choices=[
+                    Mock(message=Mock(parsed=mock_llm_responses["planner_complete"]))
+                ]
+            ),
             Mock(choices=[Mock(message=Mock(content=mock_llm_responses["reporter"]))]),
         ]
         mock_llm.think.side_effect = llm_responses
@@ -91,14 +88,12 @@ class TestSimulationFlow:
         def mock_ask(address, message, timeout=None):
             message_log.append(message)
 
-            # Simulate different responses based on message type
             if isinstance(message, InitOrchestrator):
                 return Ack(from_agent="orchestrator", to_agent="simulator")
             elif isinstance(message, SignalMessage):
                 if message.type == Signal.START:
                     return Ack(from_agent="orchestrator", to_agent="simulator")
                 elif message.type == Signal.STATUS:
-                    # Simulate progression through statuses
                     if (
                         len(
                             [
@@ -142,11 +137,9 @@ class TestSimulationFlow:
         ]
         assert len(start_messages) > 0
 
-        status_messages = [
-            m
-            for m in message_log
-            if isinstance(m, SignalMessage) and m.type == Signal.STATUS
-        ]
+        from autobox.schemas.message import SimulationSignal
+
+        status_messages = [m for m in message_log if isinstance(m, SimulationSignal)]
         assert len(status_messages) > 0
 
         stop_messages = [
@@ -164,10 +157,26 @@ class TestSimulationFlow:
         mock_actor_system_class.return_value = mock_system
         mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-        mock_system.ask.return_value = Mock(status=ActorStatus.RUNNING)
+        def mock_ask_side_effect(address, message, timeout=None):
+            from autobox.schemas.message import SimulationMessage, SimulationSignal
+            from autobox.schemas.simulation import SimulationStatus
+
+            if isinstance(message, SimulationSignal):
+                return SimulationMessage(
+                    status=SimulationStatus.IN_PROGRESS, progress=50, summary=None
+                )
+            elif isinstance(message, SignalMessage) and message.type == Signal.STOP:
+                return Status(
+                    status=ActorStatus.STOPPED,
+                    from_agent="orchestrator",
+                    to_agent="simulator",
+                )
+            return Mock(status=ActorStatus.RUNNING)
+
+        mock_system.ask.side_effect = mock_ask_side_effect
 
         config = Config(simulation=test_config, metrics=None)
-        config.simulation.timeout_seconds = 0.1  # Very short timeout
+        config.simulation.timeout_seconds = 0.1
 
         simulator = Simulator(config)
 
@@ -199,8 +208,12 @@ class TestSimulationFlow:
         mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
         def mock_ask_side_effect(address, message, timeout=None):
+            from autobox.schemas.message import SimulationSignal
+
             if isinstance(message, InitOrchestrator):
                 return Ack(from_agent="orchestrator", to_agent="simulator")
+            elif isinstance(message, SimulationSignal):
+                return None
             elif isinstance(message, SignalMessage):
                 if message.type == Signal.START:
                     return Ack(from_agent="orchestrator", to_agent="simulator")
@@ -224,7 +237,7 @@ class TestSimulationFlow:
         except AttributeError:
             pass
 
-        assert mock_system.ask.call_count >= 5  # init, start, 3 status checks
+        assert mock_system.ask.call_count >= 4  # init, start, stop, and status checks
 
     @pytest.mark.asyncio
     @patch("autobox.actor.manager.ActorSystem")
@@ -248,6 +261,27 @@ class TestSimulationFlow:
         def mock_ask(address, message, timeout=None):
             nonlocal status_index
 
+            from autobox.schemas.message import SimulationMessage, SimulationSignal
+            from autobox.schemas.simulation import SimulationStatus
+
+            if isinstance(message, SimulationSignal):
+                if status_index < len(statuses):
+                    status = statuses[status_index]
+                    status_index += 1
+                    status_map = {
+                        ActorStatus.INITIALIZED: SimulationStatus.NEW,
+                        ActorStatus.RUNNING: SimulationStatus.IN_PROGRESS,
+                        ActorStatus.COMPLETED: SimulationStatus.COMPLETED,
+                    }
+                    return SimulationMessage(
+                        status=status_map.get(status, SimulationStatus.IN_PROGRESS),
+                        progress=25 * status_index,
+                        summary=None,
+                    )
+                return SimulationMessage(
+                    status=SimulationStatus.COMPLETED, progress=100, summary=None
+                )
+
             if hasattr(message, "type"):
                 if message.type in ["init", "start"]:
                     return Mock(type="acked")
@@ -270,4 +304,4 @@ class TestSimulationFlow:
         simulator = Simulator(config)
         await simulator.run()
 
-        assert status_index == len(statuses)
+        assert status_index >= 3

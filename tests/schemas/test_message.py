@@ -76,7 +76,6 @@ class TestAck:
         ack = Ack(from_agent="test", to_agent="test")
         assert ack.type == Signal.ACKED
 
-        # Even if we try to override it
         ack2 = Ack(type=Signal.START, from_agent="test", to_agent="test")
         assert ack2.type == Signal.ACKED
 

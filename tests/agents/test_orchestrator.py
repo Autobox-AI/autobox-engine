@@ -337,7 +337,7 @@ class TestOrchestratorMessageHandling:
         """Test that worker message triggers planner when no pending agents."""
         orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
-        orchestrator.memory.pending = []  # No pending agents
+        orchestrator.memory.pending = []
         sender = Mock()
 
         msg = Message(
@@ -358,7 +358,7 @@ class TestOrchestratorMessageHandling:
         """Test that worker message doesn't trigger planner when agents are pending."""
         orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
-        orchestrator.memory.pending = ["WORKER_2"]  # WORKER_2 is still pending
+        orchestrator.memory.pending = ["WORKER_2"]
         sender = Mock()
 
         msg = Message(

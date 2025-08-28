@@ -1,9 +1,6 @@
-import asyncio
-import time
-
 from autobox.actor.manager import ActorManager
 from autobox.bootstrap.id import create_ids_by_name
-from autobox.exception.simulation import StopSimulationException
+from autobox.core.status_manager import StatusEvent, StatusManager
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.actor import Actor, ActorName, ActorStatus
 from autobox.schemas.config import Config
@@ -28,6 +25,7 @@ class Simulator:
         self.orchestrator: Actor = None
         self.agent_ids_by_name = create_ids_by_name(self.config.simulation.workers)
         self.actor_manager = ActorManager(agent_ids_by_name=self.agent_ids_by_name)
+        self.status_manager = StatusManager(self.actor_manager)
 
     async def run(self):
         self.init()
@@ -36,118 +34,38 @@ class Simulator:
 
         self.logger.info("Simulation started")
 
-        await self.loop_status_until_timeout()
+        self.status_manager.subscribe(
+            StatusEvent.STATUS_CHANGED, self._on_status_changed
+        )
+        self.status_manager.subscribe(StatusEvent.ERROR_OCCURRED, self._on_error)
+
+        await self.status_manager.start_monitoring(POLL_INTERVAL_SECONDS)
+
+        try:
+            timeout = self.config.simulation.timeout_seconds
+            final_status = await self.status_manager.wait_for_completion(timeout)
+            self.logger.info(f"Simulation completed with status: {final_status.value}")
+        except TimeoutError:
+            self.logger.warning(
+                f"Simulation timeout after {self.config.simulation.timeout_seconds}s"
+            )
+        finally:
+            await self.status_manager.stop_monitoring()
 
         self.stop_the_world()
 
         self.logger.info("Simulation finished")
 
-    async def loop_status_until_timeout(self) -> ActorStatus:
-        timeout = self.config.simulation.timeout_seconds
-        start_time = time.time()
-        last_status = None
-        consecutive_errors = 0
-
-        self.logger.info(f"Starting simulation: {self.config.simulation.name}")
-
-        while True:
-            elapsed_time = time.time() - start_time
-
-            if elapsed_time >= timeout:
-                self.logger.warning(
-                    f"Simulation timeout reached after {elapsed_time:.1f}s"
-                )
-                break
-
-            try:
-                should_continue, status, consecutive_errors = self.check_status(
-                    consecutive_errors, elapsed_time
-                )
-
-                if should_continue:
-                    continue
-
-                consecutive_errors = 0
-
-                if status != last_status:
-                    self.logger.info(
-                        f"Simulation status changed: {last_status.value if last_status else None} -> {status.value} ({elapsed_time:.1f}s)"
-                    )
-                    last_status = status
-
-                if status == ActorStatus.COMPLETED:
-                    self.logger.info(
-                        f"Simulation completed successfully after {elapsed_time:.1f}s"
-                    )
-                    break
-
-                if status in WARNING_STATUSES:
-                    self.logger.warning(
-                        f"Simulation ended with status: {status} after {elapsed_time:.1f}s"
-                    )
-                    break
-
-                if status == ActorStatus.ABORTED:
-                    self.logger.info(f"Simulation aborted after {elapsed_time:.1f}s")
-                    break
-
-            except asyncio.TimeoutError:
-                consecutive_errors += 1
-                self.logger.warning(
-                    f"Status check timeout ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}) at {elapsed_time:.1f}s"
-                )
-
-                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                    self.logger.error(
-                        f"Failed to get status {MAX_CONSECUTIVE_ERRORS} times consecutively. Stopping simulation."
-                    )
-                    break
-
-            except Exception as e:
-                consecutive_errors += 1
-                self.logger.error(
-                    f"Error checking simulation status: {e} ({elapsed_time:.1f}s)"
-                )
-
-                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                    self.logger.error(
-                        "Too many consecutive errors. Stopping simulation."
-                    )
-                    break
-
-            remaining_time = timeout - elapsed_time
-            if remaining_time < 10:
-                await asyncio.sleep(min(0.5, remaining_time))
-            else:
-                await asyncio.sleep(POLL_INTERVAL_SECONDS)
-
-        final_elapsed = time.time() - start_time
+    def _on_status_changed(self, response):
+        """Callback for status change events."""
         self.logger.info(
-            f"Simulation ending after {final_elapsed:.1f}s with status: {last_status.value}"
+            f"Status changed to: {response.status.value} "
+            f"(Progress: {response.progress}%)"
         )
-        return last_status
 
-    def check_status(self, consecutive_errors, elapsed_time):
-        response = self.status()
-
-        if response is None:
-            consecutive_errors += 1
-            self.logger.warning(
-                f"Received None response from status check ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}) at {elapsed_time:.1f}s"
-            )
-            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                self.logger.error(
-                    f"Failed to get status {MAX_CONSECUTIVE_ERRORS} times consecutively. Stopping simulation."
-                )
-                raise StopSimulationException(
-                    message="Failed to get status multiple times consecutively",
-                    consecutive_errors=consecutive_errors,
-                    elapsed_time=elapsed_time,
-                )
-
-            return True, None, consecutive_errors
-
-        return False, response.status, 0
+    def _on_error(self, error):
+        """Callback for error events."""
+        self.logger.error(f"Status monitoring error: {error}")
 
     def stop_the_world(self) -> Status:
         response: Status = self._ask_orchestrator(Signal.STOP)
@@ -156,9 +74,6 @@ class Simulator:
         else:
             self.logger.info("Orchestrator already stopped or aborted")
         return response
-
-    def status(self) -> Status:
-        return self._ask_orchestrator(Signal.STATUS)
 
     def init(self):
         self.actor_manager.ask(
@@ -179,3 +94,42 @@ class Simulator:
                 to_agent=ActorName.ORCHESTRATOR,
             )
         )
+
+    # Backward compatibility methods for tests
+    def status(self) -> Status:
+        """Legacy method for tests - gets status directly from orchestrator."""
+        return self._ask_orchestrator(Signal.STATUS)
+
+    def check_status(self, consecutive_errors, elapsed_time):
+        """Legacy method for tests - checks status and returns tuple."""
+        from autobox.exception.simulation import StopSimulationException
+
+        response = self.status()
+
+        if response is None:
+            consecutive_errors += 1
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                raise StopSimulationException(
+                    message="Failed to get status multiple times consecutively",
+                    consecutive_errors=consecutive_errors,
+                    elapsed_time=elapsed_time,
+                )
+            return True, None, consecutive_errors
+
+        return False, response.status, 0
+
+    async def loop_status_until_timeout(self) -> ActorStatus:
+        """Legacy method for tests - waits for completion."""
+        try:
+            await self.status_manager.start_monitoring(POLL_INTERVAL_SECONDS)
+            timeout = self.config.simulation.timeout_seconds
+            final_status = await self.status_manager.wait_for_completion(timeout)
+            status_map = {
+                "completed": ActorStatus.COMPLETED,
+                "failed": ActorStatus.FAILED,
+                "stopped": ActorStatus.STOPPED,
+                "aborted": ActorStatus.ABORTED,
+            }
+            return status_map.get(final_status.value, ActorStatus.UNKNOWN)
+        finally:
+            await self.status_manager.stop_monitoring()

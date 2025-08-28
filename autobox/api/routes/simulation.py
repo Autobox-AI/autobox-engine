@@ -47,9 +47,9 @@ async def abort_simulation(request: Request) -> dict:
     """
     logger.info("Abort simulation requested.")
 
-    actor_manager = request.app.state.actor_manager
-    if not actor_manager:
-        logger.warning("Actor manager not initialized, cannot abort.")
+    status_manager = request.app.state.status_manager
+    if not status_manager or not status_manager.actor_manager:
+        logger.warning("Status manager not initialized, cannot abort.")
         return {"status": "error", "message": "No active simulation to abort"}
 
     try:
@@ -57,7 +57,7 @@ async def abort_simulation(request: Request) -> dict:
             from_agent="api", to_agent="orchestrator", type=Signal.ABORT
         )
 
-        response = actor_manager.abort_simulation()
+        response = status_manager.actor_manager.abort_simulation()
 
         cache = request.app.state.simulation_cache
         cache["status"] = "aborted"

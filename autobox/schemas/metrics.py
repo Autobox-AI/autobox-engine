@@ -78,11 +78,8 @@ class SummaryValue(MetricValue):
 
 class Metric(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
+
     name: str
-    # description: str
-    # type: MetricType
-    # unit: str
     values: List[CounterValue | GaugeValue | HistogramValue | SummaryValue]
 
 

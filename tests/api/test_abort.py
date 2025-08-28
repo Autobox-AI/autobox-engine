@@ -23,11 +23,14 @@ class TestAbortFunctionality:
         assert "No active simulation" in data["message"]
 
     def test_abort_endpoint_with_actor_manager(self):
-        """Test abort endpoint with a mock actor manager."""
+        """Test abort endpoint with a mock status manager."""
         mock_actor_manager = MagicMock()
         mock_actor_manager.abort_simulation.return_value = "aborted"
+        
+        mock_status_manager = MagicMock()
+        mock_status_manager.actor_manager = mock_actor_manager
 
-        app = create_app(mock_actor_manager)
+        app = create_app(mock_status_manager)
         client = TestClient(app)
 
         response = client.post("/status/abort")
@@ -44,8 +47,11 @@ class TestAbortFunctionality:
         mock_actor_manager.abort_simulation.side_effect = RuntimeError(
             "Actor not found"
         )
+        
+        mock_status_manager = MagicMock()
+        mock_status_manager.actor_manager = mock_actor_manager
 
-        app = create_app(mock_actor_manager)
+        app = create_app(mock_status_manager)
         client = TestClient(app)
 
         response = client.post("/status/abort")
