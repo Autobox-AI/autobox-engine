@@ -6,11 +6,11 @@ from autobox.logging.logger import LoggerManager
 from autobox.schemas.message import Signal, SignalMessage
 from autobox.schemas.simulation import SimulationResponse
 
-router = APIRouter(prefix="/status", tags=["simulation"])
+router = APIRouter(tags=["simulation"])
 logger = LoggerManager.get_server_logger()
 
 
-@router.get("", response_model=SimulationResponse)
+@router.get("/status", response_model=SimulationResponse)
 async def get_status(request: Request) -> SimulationResponse:
     """Get simulation status from cache (non-blocking).
 

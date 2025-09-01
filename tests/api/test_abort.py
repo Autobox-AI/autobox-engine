@@ -16,7 +16,7 @@ class TestAbortFunctionality:
         app = create_app()
         client = TestClient(app)
 
-        response = client.post("/status/abort")
+        response = client.post("/abort")
         assert response.status_code == 202
         data = response.json()
         assert data["status"] == "error"
@@ -33,7 +33,7 @@ class TestAbortFunctionality:
         app = create_app(mock_status_manager)
         client = TestClient(app)
 
-        response = client.post("/status/abort")
+        response = client.post("/abort")
         assert response.status_code == 202
 
         mock_actor_manager.abort_simulation.assert_called_once()
@@ -54,7 +54,7 @@ class TestAbortFunctionality:
         app = create_app(mock_status_manager)
         client = TestClient(app)
 
-        response = client.post("/status/abort")
+        response = client.post("/abort")
         assert response.status_code == 202
         data = response.json()
         assert data["status"] == "error"

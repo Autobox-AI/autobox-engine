@@ -225,7 +225,7 @@ curl http://localhost:<PORT>/health
 
 ```bash
 # Abort a running simulation
-curl -X POST http://localhost:<PORT>/status/abort
+curl -X POST http://localhost:<PORT>/abort
 ```
 
 **Abort Endpoint Features:**

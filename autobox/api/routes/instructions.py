@@ -27,9 +27,9 @@ async def send_instruction(
     """
     logger.info(f"Sending instructions to agent {agent_name}.")
     
-    actor_manager = request.app.state.actor_manager
-    if actor_manager:
-        actor_manager.instruct(agent_name, instruction_request.instruction)
+    status_manager = request.app.state.status_manager
+    if status_manager and status_manager.actor_manager:
+        status_manager.actor_manager.instruct(agent_name, instruction_request.instruction)
     else:
         logger.warning("Actor manager not initialized, instruction not sent.")
         
