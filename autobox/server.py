@@ -60,6 +60,8 @@ def start_server(config: ServerConfig, actor_manager: ActorManager = None):
                 host=config.host,
                 port=config.port,
                 reload=False,  # Can't use reload with custom factory
+                loop="asyncio",  # Use asyncio event loop
+                access_log=False,  # Disable access logs for better performance
             )
         else:
             # Without actor manager, use the standard factory pattern

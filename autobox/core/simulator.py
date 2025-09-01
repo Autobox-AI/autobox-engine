@@ -7,10 +7,17 @@ from autobox.exception.simulation import StopSimulationException
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.actor import Actor, ActorName, ActorStatus
 from autobox.schemas.config import Config
-from autobox.schemas.message import InitOrchestrator, Signal, SignalMessage, Status
+from autobox.schemas.message import (
+    CompleteStatusRequest,
+    CompleteStatusResponse,
+    InitOrchestrator, 
+    Signal, 
+    SignalMessage,
+    Status
+)
 
 POLL_INTERVAL_SECONDS = 1
-STATUS_CHECK_TIMEOUT_SECONDS = 5
+STATUS_CHECK_TIMEOUT_SECONDS = 15  # Increased to handle LLM response times
 MAX_CONSECUTIVE_ERRORS = 3
 WARNING_STATUSES = [
     ActorStatus.STOPPED,
@@ -27,7 +34,15 @@ class Simulator:
         self.logger = LoggerManager.get_runner_logger()
         self.orchestrator: Actor = None
         self.agent_ids_by_name = create_ids_by_name(self.config.simulation.workers)
-        self.actor_manager = ActorManager(agent_ids_by_name=self.agent_ids_by_name)
+        self.actor_manager = ActorManager(agent_ids_by_name=self.agent_ids_by_name, simulator=self)
+        
+        # Cache for status and metrics to share with API
+        self.cache = {
+            "simulation": None,  # SimulationMessage
+            "metrics": [],       # List of MetricMessage
+            "status": None,      # ActorStatus
+            "last_updated": None
+        }
 
     async def run(self):
         self.init()
@@ -128,8 +143,9 @@ class Simulator:
         return last_status
 
     def check_status(self, consecutive_errors, elapsed_time):
-        response = self.status()
-
+        # Fetch all data with a single request
+        response = self._get_complete_status()
+        
         if response is None:
             consecutive_errors += 1
             self.logger.warning(
@@ -144,9 +160,18 @@ class Simulator:
                     consecutive_errors=consecutive_errors,
                     elapsed_time=elapsed_time,
                 )
-
             return True, None, consecutive_errors
-
+        
+        # Update cache with all data from single response
+        self.cache["status"] = response.status
+        self.cache["simulation"] = {
+            "status": response.simulation_status,
+            "progress": response.progress,
+            "summary": response.summary
+        }
+        self.cache["metrics"] = response.metrics
+        self.cache["last_updated"] = time.time()
+        
         return False, response.status, 0
 
     def stop_the_world(self) -> Status:
@@ -172,10 +197,84 @@ class Simulator:
 
     def _ask_orchestrator(self, signal: Signal) -> Status:
         """Helper method to send messages from SIMULATOR to ORCHESTRATOR"""
-        return self.actor_manager.ask(
-            SignalMessage(
-                type=signal,
-                from_agent=ActorName.SIMULATOR,
-                to_agent=ActorName.ORCHESTRATOR,
+        max_retries = 10
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            response = self.actor_manager.ask(
+                SignalMessage(
+                    type=signal,
+                    from_agent=ActorName.SIMULATOR,
+                    to_agent=ActorName.ORCHESTRATOR,
+                )
             )
-        )
+            
+            # If we get the right type of response, return it
+            if signal == Signal.STATUS and isinstance(response, Status):
+                return response
+            elif signal != Signal.STATUS:
+                return response
+                
+            # Wrong message type - log and retry
+            if response is not None:
+                self.logger.warning(
+                    f"Expected Status response but got {type(response).__name__}"
+                )
+            
+            retry_count += 1
+            time.sleep(0.1)  # Brief delay before retry
+        
+        # After max retries, return None
+        self.logger.warning(f"Failed to get correct response type after {max_retries} retries")
+        return None
+    
+    def _get_complete_status(self) -> CompleteStatusResponse:
+        """Get complete status with a single request to orchestrator"""
+        max_retries = 10
+        retry_count = 0
+        unexpected_messages = []
+        
+        while retry_count < max_retries:
+            response = self.actor_manager.ask(
+                CompleteStatusRequest(
+                    from_agent=ActorName.SIMULATOR,
+                    to_agent=ActorName.ORCHESTRATOR,
+                )
+            )
+            
+            # If we get the right type of response, return it
+            if isinstance(response, CompleteStatusResponse):
+                # Log any unexpected messages we encountered
+                if unexpected_messages:
+                    msg_types = ', '.join(set(unexpected_messages))
+                    self.logger.debug(
+                        f"Discarded {len(unexpected_messages)} unexpected message(s): {msg_types}"
+                    )
+                return response
+                
+            # Wrong message type - track it and retry
+            if response is not None:
+                msg_type = type(response).__name__
+                unexpected_messages.append(msg_type)
+            
+            retry_count += 1
+            time.sleep(0.1)  # Brief delay before retry
+        
+        # After max retries, log what we received and return None
+        if unexpected_messages:
+            msg_types = ', '.join(set(unexpected_messages))
+            self.logger.warning(
+                f"Failed to get CompleteStatusResponse after {max_retries} retries. "
+                f"Received: {msg_types}"
+            )
+        else:
+            self.logger.warning(f"Failed to get complete status after {max_retries} retries")
+        return None
+    
+    def get_cached_data(self):
+        """Get the cached simulation data for API server"""
+        return self.cache.copy()
+
+    def get_cached_data(self):
+        """Get the cached simulation data for API server"""
+        return self.cache.copy()

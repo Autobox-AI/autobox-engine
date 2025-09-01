@@ -1,16 +1,19 @@
 """Simulation status and control endpoints."""
 
+from datetime import datetime
+from typing import List
+
 from fastapi import APIRouter, Request, Response, status
 
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.message import Signal, SignalMessage
+from autobox.schemas.message import MetricMessage, Signal, SignalMessage
 from autobox.schemas.simulation import SimulationResponse
 
-router = APIRouter(prefix="/status", tags=["simulation"])
+router = APIRouter(prefix="", tags=["simulation"])
 logger = LoggerManager.get_server_logger()
 
 
-@router.get("", response_model=SimulationResponse)
+@router.get("/status", response_model=SimulationResponse)
 async def get_status(request: Request) -> SimulationResponse:
     """Get simulation status from cache (non-blocking).
 
@@ -24,11 +27,11 @@ async def get_status(request: Request) -> SimulationResponse:
     cache = request.app.state.simulation_cache
 
     return SimulationResponse(
-        status=cache.get("status", "unknown"),
-        progress=cache.get("progress", 0),
-        summary=cache.get("summary"),
-        last_updated=cache.get("last_updated"),
-        error=cache.get("error"),
+        status=cache["status"].get("status", "new"),
+        progress=cache["status"].get("progress", 0),
+        summary=cache["status"].get("summary"),
+        last_updated=cache["status"].get("last_updated"),
+        error=cache["status"].get("error"),
     )
 
 
@@ -60,8 +63,9 @@ async def abort_simulation(request: Request) -> dict:
         response = actor_manager.abort_simulation()
 
         cache = request.app.state.simulation_cache
-        cache["status"] = "aborted"
-        cache["error"] = "Simulation aborted by user"
+        cache["status"]["status"] = "aborted"
+        cache["status"]["error"] = "Simulation aborted by user"
+        cache["status"]["last_updated"] = str(datetime.now())
 
         logger.info("Abort signal sent to orchestrator")
 
@@ -70,3 +74,10 @@ async def abort_simulation(request: Request) -> dict:
     except Exception as e:
         logger.error(f"Failed to abort simulation: {e}")
         return {"status": "error", "message": f"Failed to abort simulation: {str(e)}"}
+
+
+@router.get("/metrics", response_model=List[MetricMessage])
+async def get_metrics(request: Request) -> List[MetricMessage]:
+    """Get metrics from cache."""
+    cache = request.app.state.simulation_cache
+    return cache["metrics"]

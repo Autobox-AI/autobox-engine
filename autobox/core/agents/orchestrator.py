@@ -3,6 +3,7 @@
 
 import json
 import os
+from typing import Dict, List
 
 from thespian.actors import ActorAddress, ActorExitRequest
 
@@ -15,6 +16,9 @@ from autobox.core.agents.worker import Worker
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     Ack,
+    CompleteStatusRequest,
+    CompleteStatusResponse,
+    EvaluatorMessageContent,
     InitAgent,
     InitEvaluator,
     InitOrchestrator,
@@ -22,12 +26,16 @@ from autobox.schemas.message import (
     InitReporter,
     InstructionMessage,
     Message,
+    MetricMessage,
+    MetricsMessage,
+    MetricsSignal,
     Signal,
     SignalMessage,
     SimulationMessage,
     SimulationSignal,
     Status,
 )
+from autobox.schemas.metrics import MetricDefinition, TagDefinition
 from autobox.schemas.planner import PlannerOutput
 from autobox.schemas.simulation import SimulationStatus
 
@@ -41,18 +49,26 @@ class Orchestrator(BaseAgent):
         self.simulation_summary = None
         self.simulation_status: SimulationStatus = None
         self.name: str = ActorName.ORCHESTRATOR.value
+        self.metrics_values: List[MetricMessage] = []
+        self.metrics_definitions: Dict[str, MetricDefinition] = {}
 
     def receiveMessage(self, message, sender):
         """Main message handler - delegates to specific handlers based on message type."""
 
         if isinstance(message, InitOrchestrator):
             self.handle_init(sender, message)
+        elif isinstance(message, CompleteStatusRequest):
+            self._handle_complete_status_request(sender)
         elif isinstance(message, SimulationSignal):
             self._handle_simulation_signal(sender)
+        elif isinstance(message, MetricsSignal):
+            self._handle_metrics_signal(sender)
         elif isinstance(message, SignalMessage):
             self._handle_signal_message(message, sender)
         elif isinstance(message, InstructionMessage):
             self._handle_instruction_message(message)
+        elif isinstance(message, MetricsMessage):
+            self._handle_metrics_message(message)
         elif isinstance(message, Message):
             self._handle_agent_message(message)
         elif isinstance(message, ActorExitRequest):
@@ -73,11 +89,53 @@ class Orchestrator(BaseAgent):
         self.send(
             sender,
             SimulationMessage(
-                status=self.simulation_status,
+                status=self.simulation_status or SimulationStatus.NEW,
                 progress=self.simulation_progress,
                 summary=self.simulation_summary,
             ),
         )
+
+    def _handle_complete_status_request(self, sender):
+        """Send complete status including simulation info and metrics to requestor.
+        
+        Note: We send the response immediately with cached metrics rather than
+        waiting for fresh metrics from the evaluator. The evaluator will update
+        metrics asynchronously, and the next status request will include those
+        updated values.
+        """
+        # Request fresh metrics for next time (async, non-blocking)
+        self.send(self.addresses["evaluator"], MetricsSignal())
+        
+        # Send unified response with current cached data
+        self.send(
+            sender,
+            CompleteStatusResponse(
+                from_agent=self.name,
+                to_agent=ActorName.SIMULATOR,
+                status=self.status,
+                simulation_status=self.simulation_status or SimulationStatus.NEW,
+                progress=self.simulation_progress,
+                summary=self.simulation_summary,
+                metrics=self.metrics_values,
+            ),
+        )
+
+    def _handle_metrics_signal(self, sender):
+        """Send current metrics to requestor."""
+        self.send(self.addresses["evaluator"], MetricsSignal())
+
+        self.send(
+            sender,
+            MetricsMessage(
+                from_agent=self.name,
+                to_agent=ActorName.SERVER,
+                metrics=self.metrics_values,
+            ),
+        )
+
+    def _handle_metrics_message(self, message: MetricsMessage):
+        """Handle metrics message."""
+        self.metrics_values = message.metrics
 
     def _handle_signal_message(self, message, sender):
         """Process various signal messages."""
@@ -171,6 +229,14 @@ class Orchestrator(BaseAgent):
 
         self.memory.add_message(message)
 
+        if message.from_agent == ActorName.EVALUATOR:
+            # Evaluator sends back evaluation results - just log it
+            self.logger.info(f"Received evaluation from {message.from_agent}")
+            return
+
+        if self.simulation_progress > 5:
+            self._evaluate()
+
         if message.from_agent == ActorName.REPORTER:
             self._handle_reporter_completion(message)
             return
@@ -230,6 +296,21 @@ class Orchestrator(BaseAgent):
             ),
         )
 
+    def _evaluate(self):
+        """Send message to evaluator."""
+        content = EvaluatorMessageContent(
+            history=self.memory.get_history_str(),
+            progress=self.simulation_progress,
+        )
+        self.send(
+            self.addresses["evaluator"],
+            Message(
+                from_agent=self.name,
+                to_agent=ActorName.EVALUATOR,
+                content=json.dumps(content.model_dump()),
+            ),
+        )
+
     def _initiate_reporting(self):
         """Start the reporting phase."""
         self.simulation_status = SimulationStatus.SUMMARIZING
@@ -279,12 +360,32 @@ class Orchestrator(BaseAgent):
                 orchestrator_instruction=message.config.simulation.orchestrator.instruction,
                 task=message.config.simulation.task,
             )
+            # TODO: fix the transformation of generated metrics into metrics definitions
         else:
             metrics = message.config.metrics
 
-        metrics_definitions = json.dumps(
-            {metric.name: (metric.model_dump()) for metric in metrics}
-        )
+        metrics_definitions = [
+            MetricDefinition(
+                name=metric.name,
+                description=metric.description,
+                type=metric.type,
+                unit=metric.unit,
+                tags=[
+                    TagDefinition(tag=tag.tag, description=tag.description)
+                    for tag in metric.tags
+                ],
+            )
+            for metric in metrics
+        ]
+
+        # Store metrics definitions for later use
+        self.metrics_definitions = {
+            metric.name: metric for metric in metrics_definitions
+        }
+
+        # metrics_definitions_json = json.dumps(
+        #     {metric.name: (metric.model_dump()) for metric in metrics}
+        # )
 
         worker_configs_by_name = message.config.get_worker_configs_by_name()
         self.planner = self.createActor(Planner, globalName="planner")
@@ -350,5 +451,8 @@ class Orchestrator(BaseAgent):
             )
 
         self.status = ActorStatus.INITIALIZED
-        self.send(sender, Ack(from_agent=self.name, to_agent="simulator"))
+        self.send(
+            sender,
+            Ack(from_agent=self.name, to_agent=ActorName.SIMULATOR),
+        )
         self.logger.info(f"Orchestrator initialized (pid: {os.getpid()})")

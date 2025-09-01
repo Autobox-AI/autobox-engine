@@ -1,11 +1,22 @@
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from openai import BaseModel
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
+from thespian.actors import ActorAddress
 
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import AgentConfig, Config
+from autobox.schemas.metrics import (
+    CounterValue,
+    GaugeValue,
+    HistogramValue,
+    MetricDefinition,
+    MetricType,
+    SummaryValue,
+    Tag,
+    TagDefinition,
+)
 from autobox.schemas.simulation import SimulationStatus
 
 
@@ -21,6 +32,7 @@ class Signal(str, Enum):
     ERROR = "error"
     ACKED = "acked"
     SIMULATION = "simulation"
+    METRICS = "metrics"
 
 
 class BaseMessage(BaseModel):
@@ -63,6 +75,63 @@ class Ack(SignalMessage):
         return Signal.ACKED
 
 
+class MetricsSignal(SignalMessage):
+    type: Signal = Signal.METRICS
+    to_agent: str = ActorName.EVALUATOR
+    from_agent: str = ActorName.SERVER
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.METRICS
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.EVALUATOR
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.SERVER
+
+
+class MetricValueMessage(BaseModel):
+    value: CounterValue | GaugeValue | HistogramValue | SummaryValue
+    tags: List[Tag]
+
+
+class MetricMessage(BaseModel):
+    name: str
+    description: str
+    type: MetricType
+    unit: str
+    tags: List[TagDefinition]
+    values: List[MetricValueMessage]
+
+
+class MetricsMessage(BaseMessage):
+    from_agent: str = Field(default=ActorName.EVALUATOR)
+    to_agent: str = Field(default=ActorName.ORCHESTRATOR)
+    metrics: List[MetricMessage]
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.EVALUATOR
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.ORCHESTRATOR
+
+
+class AddressMessage(BaseMessage):
+    address: ActorAddress
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
 class Message(BaseMessage):
     content: str = Field(default=None)
 
@@ -70,6 +139,7 @@ class Message(BaseMessage):
 class SimulationMessage(Message):
     status: SimulationStatus
     progress: int
+    summary: Optional[str] = None
 
 
 class InstructionMessage(Message):
@@ -103,8 +173,37 @@ class InitPlanner(InitAgent):
 
 class InitEvaluator(InitAgent):
     workers_info: str
-    metrics_definitions: str
+    metrics_definitions: List[MetricDefinition]
 
 
 class InitReporter(InitAgent):
     workers_info: str
+
+
+class EvaluatorMessageContent(BaseModel):
+    history: str
+    progress: int
+
+
+class CompleteStatusRequest(SignalMessage):
+    """Request for complete status including simulation and metrics"""
+    type: Signal = Signal.STATUS
+    
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.STATUS
+
+
+class CompleteStatusResponse(BaseMessage):
+    """Unified response with all simulation data"""
+    # Actor status
+    status: ActorStatus
+    
+    # Simulation info
+    simulation_status: Optional[SimulationStatus] = None
+    progress: int = 0
+    summary: Optional[str] = None
+    
+    # Metrics
+    metrics: List[MetricMessage] = []

@@ -3,13 +3,13 @@ import asyncio
 import uvicorn
 
 from autobox.actor.manager import ActorManager
+from autobox.api import create_app
 from autobox.config.cli import parse_args
 from autobox.config.loader import load_config
 from autobox.core.runner import Runner
 from autobox.core.simulator import Simulator
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.config import ServerConfig
-from autobox.api import create_app
 
 
 async def run_server(
@@ -96,6 +96,8 @@ async def main():
     app_logger.info(f"📝 SIMULATION ID: {simulation_id}")
     app_logger.info("🔍 Check status with:")
     app_logger.info(f"   curl http://localhost:{config.server.port}/status")
+    app_logger.info("📊 Check metrics with:")
+    app_logger.info(f"   curl http://localhost:{config.server.port}/metrics")
     app_logger.info("=" * 60)
 
     runner = Runner(simulator=simulator)

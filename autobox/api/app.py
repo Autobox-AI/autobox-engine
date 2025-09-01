@@ -1,6 +1,7 @@
 """FastAPI application factory and configuration."""
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI
@@ -15,40 +16,37 @@ from autobox.logging.logger import LoggerManager
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """Manage application lifespan with startup and shutdown events.
-    
+
     Args:
         app: The FastAPI application instance
-        
+
     Yields:
         None during application runtime
     """
     # Startup
     logger = LoggerManager.get_server_logger()
     logger.info("Starting Autobox API server...")
-    
+
     actor_manager = getattr(app.state, "actor_manager", None)
     status_updater = None
-    
+
     if actor_manager:
         # Create and start status updater
-        status_updater = StatusCacheUpdater(
-            actor_manager,
-            app.state.simulation_cache
-        )
+        status_updater = StatusCacheUpdater(actor_manager, app.state.simulation_cache)
         await status_updater.start()
         app.state.status_updater = status_updater
         logger.info("Background tasks started successfully")
     else:
         logger.warning("No actor manager provided, running in limited mode")
-    
+
     yield  # Application runs
-    
+
     # Shutdown
     logger.info("Shutting down Autobox API server...")
-    
+
     if status_updater:
         await status_updater.stop()
-    
+
     logger.info("Autobox API server shutdown complete")
 
 
@@ -65,7 +63,7 @@ class AutoboxApp:
             title="Autobox API",
             description="Multi-agent AI simulation platform API",
             version="1.0.0",
-            lifespan=lifespan
+            lifespan=lifespan,
         )
         self.logger = LoggerManager.get_server_logger()
         self.actor_manager = actor_manager
@@ -81,11 +79,14 @@ class AutoboxApp:
         """Initialize application state."""
         self.app.state.actor_manager = self.actor_manager
         self.app.state.simulation_cache = {
-            "status": "initializing",
-            "progress": 0,
-            "summary": None,
-            "last_updated": None,
-            "error": None,
+            "status": {
+                "status": "new",  # Changed from "initializing" to valid enum value
+                "progress": 0,
+                "summary": None,
+                "last_updated": str(datetime.now()),  # Set to current timestamp instead of None
+                "error": None,
+            },
+            "metrics": [],
         }
         self.app.state.cache_update_task = None
         self.app.state.status_updater = None
