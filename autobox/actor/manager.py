@@ -36,7 +36,7 @@ class ActorManager:
             response = self.system.ask(
                 self.orchestrator_actor.address,
                 SimulationSignal(),
-                timeout=0.5,
+                timeout=STATUS_CHECK_TIMEOUT_SECONDS,
             )
             return response is not None
         except Exception as e:
@@ -52,7 +52,7 @@ class ActorManager:
             response = self.system.ask(
                 self.orchestrator_actor.address,
                 message,
-                timeout=2.0,
+                timeout=STATUS_CHECK_TIMEOUT_SECONDS,
             )
             return response
         except Exception:
@@ -66,11 +66,11 @@ class ActorManager:
             timeout=STATUS_CHECK_TIMEOUT_SECONDS,
         )
 
-    def abort_simulation(self) -> str:
+    def abort_simulation(self) -> None:
         """Abort the running simulation by sending ABORT signal to orchestrator.
 
-        Returns:
-            str: Response from orchestrator
+        This method sends an abort signal without waiting for a response,
+        making it non-blocking for async API endpoints.
         """
         if not self.orchestrator_actor:
             raise RuntimeError("Orchestrator actor not initialized")
@@ -82,11 +82,8 @@ class ActorManager:
         )
 
         try:
-            response = self.system.ask(
-                self.orchestrator_actor.address, abort_signal, timeout=5
-            )
-            self.logger.info(f"Abort response from orchestrator: {response}")
-            return response
+            self.system.tell(self.orchestrator_actor.address, abort_signal)
+            self.logger.info("Abort signal sent to orchestrator (non-blocking)")
         except Exception as e:
             self.logger.error(f"Failed to send abort signal: {e}")
             raise

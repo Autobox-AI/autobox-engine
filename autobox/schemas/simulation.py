@@ -14,6 +14,7 @@ class SimulationStatus(str, Enum):
     ABORTED = "aborted"
     STOPPED = "stopped"
     NEW = "new"
+    UNKNOWN = "unknown"
 
 
 class SimulationResponse(BaseModel):

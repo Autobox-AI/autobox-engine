@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Request, Response, status
 
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.message import Signal, SignalMessage
 from autobox.schemas.simulation import SimulationResponse
 
 router = APIRouter(tags=["simulation"])
@@ -33,40 +32,36 @@ async def get_status(request: Request) -> SimulationResponse:
 
 
 @router.post("/abort", status_code=status.HTTP_202_ACCEPTED)
-async def abort_simulation(request: Request) -> dict:
+async def abort_simulation(request: Request) -> Response:
     """Abort the currently running simulation.
 
     Sends an ABORT signal to the orchestrator which will trigger
-    a graceful shutdown of all agents.
+    a graceful shutdown of all agents. Returns immediately with 202 Accepted.
 
     Args:
         request: The FastAPI request object
 
     Returns:
-        dict: Confirmation message
+        Response: 202 Accepted status
     """
     logger.info("Abort simulation requested.")
 
     status_manager = request.app.state.status_manager
     if not status_manager or not status_manager.actor_manager:
         logger.warning("Status manager not initialized, cannot abort.")
-        return {"status": "error", "message": "No active simulation to abort"}
-
-    try:
-        abort_signal = SignalMessage(
-            from_agent="api", to_agent="orchestrator", type=Signal.ABORT
-        )
-
-        response = status_manager.actor_manager.abort_simulation()
-
-        cache = request.app.state.simulation_cache
-        cache["status"] = "aborted"
-        cache["error"] = "Simulation aborted by user"
-
-        logger.info("Abort signal sent to orchestrator")
-
         return Response(status_code=status.HTTP_202_ACCEPTED)
 
+    try:
+        status_manager.actor_manager.abort_simulation()
+
+        cache = request.app.state.simulation_cache
+        cache["status"] = "aborting"
+        cache["message"] = "Abort requested - shutting down agents"
+
+        logger.info("Abort signal sent to orchestrator (non-blocking)")
+
     except Exception as e:
-        logger.error(f"Failed to abort simulation: {e}")
-        return {"status": "error", "message": f"Failed to abort simulation: {str(e)}"}
+        logger.error(f"Failed to send abort signal: {e}")
+        # Still return 202 even on error to maintain async contract
+
+    return Response(status_code=status.HTTP_202_ACCEPTED)

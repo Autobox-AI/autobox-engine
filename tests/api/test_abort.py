@@ -18,14 +18,13 @@ class TestAbortFunctionality:
 
         response = client.post("/abort")
         assert response.status_code == 202
-        data = response.json()
-        assert data["status"] == "error"
-        assert "No active simulation" in data["message"]
+        # Endpoint now returns 202 with no body even when no actor manager
 
     def test_abort_endpoint_with_actor_manager(self):
         """Test abort endpoint with a mock status manager."""
         mock_actor_manager = MagicMock()
-        mock_actor_manager.abort_simulation.return_value = "aborted"
+        # abort_simulation now returns None (uses tell instead of ask)
+        mock_actor_manager.abort_simulation.return_value = None
         
         mock_status_manager = MagicMock()
         mock_status_manager.actor_manager = mock_actor_manager
@@ -35,11 +34,14 @@ class TestAbortFunctionality:
 
         response = client.post("/abort")
         assert response.status_code == 202
+        # No body returned for 202 response
+        assert response.content == b""
 
         mock_actor_manager.abort_simulation.assert_called_once()
 
-        assert app.state.simulation_cache["status"] == "aborted"
-        assert "aborted by user" in app.state.simulation_cache["error"].lower()
+        # Cache now shows "aborting" status instead of "aborted"
+        assert app.state.simulation_cache["status"] == "aborting"
+        assert "Abort requested" in app.state.simulation_cache["message"]
 
     def test_abort_endpoint_with_exception(self):
         """Test abort endpoint when actor manager throws an exception."""
@@ -55,10 +57,10 @@ class TestAbortFunctionality:
         client = TestClient(app)
 
         response = client.post("/abort")
+        # Still returns 202 even on error to maintain async contract
         assert response.status_code == 202
-        data = response.json()
-        assert data["status"] == "error"
-        assert "Failed to abort" in data["message"]
+        # No body returned for 202 response
+        assert response.content == b""
 
     def test_orchestrator_abort_signal_handling(self):
         """Test that orchestrator properly handles ABORT signal."""
