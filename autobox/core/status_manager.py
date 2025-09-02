@@ -56,6 +56,7 @@ class StatusManager:
             "last_updated": None,
             "error": None,
             "consecutive_errors": 0,
+            "metrics": [],
         }
 
         self._subscribers: Dict[StatusEvent, List[Callable]] = {
@@ -139,6 +140,9 @@ class StatusManager:
             )
 
             if response is None:
+                current_status = self.cache.get("status")
+                if current_status in self.TERMINAL_STATUSES:
+                    return None
                 raise RuntimeError("Received None response from orchestrator")
 
             self.cache["consecutive_errors"] = 0
@@ -146,7 +150,9 @@ class StatusManager:
             return response
 
         except Exception as e:
-            self.logger.warning(f"Failed to fetch status: {e}")
+            current_status = self.cache.get("status")
+            if current_status not in self.TERMINAL_STATUSES:
+                self.logger.warning(f"Failed to fetch status: {e}")
 
             if (
                 "Actor" in str(e)
@@ -167,6 +173,7 @@ class StatusManager:
         """
         old_status = self.cache.get("status")
         old_progress = self.cache.get("progress", 0)
+        metrics = self.cache.get("metrics", [])
 
         self.cache.update(
             {
@@ -175,6 +182,7 @@ class StatusManager:
                 "summary": response.summary,
                 "last_updated": datetime.now().isoformat(),
                 "error": None,
+                "metrics": metrics,
             }
         )
 
@@ -194,13 +202,15 @@ class StatusManager:
         Args:
             error: The exception that occurred
         """
-        self.logger.error(f"Error fetching status: {error}")
-        self.cache["error"] = str(error)
-
-        await self._notify_subscribers(StatusEvent.ERROR_OCCURRED, error)
+        current_status = self.cache.get("status")
+        if current_status not in self.TERMINAL_STATUSES:
+            self.logger.error(f"Error fetching status: {error}")
+            self.cache["error"] = str(error)
+            await self._notify_subscribers(StatusEvent.ERROR_OCCURRED, error)
 
         if self.cache["consecutive_errors"] >= 3:
-            self.logger.error("Too many consecutive errors, stopping monitoring")
+            if current_status not in self.TERMINAL_STATUSES:
+                self.logger.error("Too many consecutive errors, stopping monitoring")
             self._running = False
 
     def subscribe(self, event: StatusEvent, callback: Callable) -> None:

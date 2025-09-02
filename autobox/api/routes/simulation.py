@@ -1,9 +1,12 @@
 """Simulation status and control endpoints."""
 
+from typing import List
+
 from fastapi import APIRouter, Request, Response, status
 
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.simulation import SimulationResponse
+from autobox.schemas.message import MetricMessage
+from autobox.schemas.simulation import MetricsResponse, SimulationResponse
 
 router = APIRouter(tags=["simulation"])
 logger = LoggerManager.get_server_logger()
@@ -62,6 +65,13 @@ async def abort_simulation(request: Request) -> Response:
 
     except Exception as e:
         logger.error(f"Failed to send abort signal: {e}")
-        # Still return 202 even on error to maintain async contract
 
     return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.get("/metrics", response_model=MetricsResponse)
+async def get_metrics(request: Request) -> List[MetricMessage]:
+    """Get metrics from cache."""
+    cache = request.app.state.simulation_cache
+
+    return MetricsResponse(metrics=cache["metrics"])

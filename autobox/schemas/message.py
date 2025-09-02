@@ -1,11 +1,21 @@
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from openai import BaseModel
 from pydantic import Field, field_validator
 
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import AgentConfig, Config
+from autobox.schemas.metrics import (
+    CounterValue,
+    GaugeValue,
+    HistogramValue,
+    MetricDefinition,
+    MetricType,
+    SummaryValue,
+    Tag,
+    TagDefinition,
+)
 from autobox.schemas.simulation import SimulationStatus
 
 
@@ -21,6 +31,7 @@ class Signal(str, Enum):
     ERROR = "error"
     ACKED = "acked"
     SIMULATION = "simulation"
+    METRICS = "metrics"
 
 
 class BaseMessage(BaseModel):
@@ -67,11 +78,6 @@ class Message(BaseMessage):
     content: str = Field(default=None)
 
 
-class SimulationMessage(Message):
-    status: SimulationStatus
-    progress: int
-
-
 class InstructionMessage(Message):
     agent_name: str
 
@@ -103,8 +109,70 @@ class InitPlanner(InitAgent):
 
 class InitEvaluator(InitAgent):
     workers_info: str
-    metrics_definitions: str
+    metrics_definitions: List[MetricDefinition]
 
 
 class InitReporter(InitAgent):
     workers_info: str
+
+
+class MetricsSignal(SignalMessage):
+    type: Signal = Signal.METRICS
+    to_agent: str = ActorName.EVALUATOR
+    from_agent: str = ActorName.SERVER
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.METRICS
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.EVALUATOR
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.SERVER
+
+
+class MetricValueMessage(BaseModel):
+    value: CounterValue | GaugeValue | HistogramValue | SummaryValue
+    tags: List[Tag]
+
+
+class MetricMessage(BaseModel):
+    name: str
+    description: str
+    type: MetricType
+    unit: str
+    tags: List[TagDefinition]
+    values: List[MetricValueMessage]
+
+
+class MetricsMessage(BaseMessage):
+    from_agent: str = Field(default=ActorName.EVALUATOR)
+    to_agent: str = Field(default=ActorName.ORCHESTRATOR)
+    metrics: List[MetricMessage]
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.EVALUATOR
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.ORCHESTRATOR
+
+
+class EvaluatorMessageContent(BaseModel):
+    history: str
+    progress: int
+
+
+class SimulationMessage(Message):
+    status: SimulationStatus
+    progress: int
+    metrics: List[MetricMessage] = Field(default=[])

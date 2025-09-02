@@ -1,7 +1,17 @@
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import List
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class Tag(BaseModel):
+    key: str = Field(description="The key of the tag.")
+    value: str = Field(description="The value of the tag.")
+
+
+class TagDefinition(BaseModel):
+    tag: str = Field(description="The name of the tag.")
+    description: str = Field(description="The description of the tag.")
 
 
 class MetricType(str, Enum):
@@ -12,34 +22,21 @@ class MetricType(str, Enum):
 
 
 class MetricDefinition(BaseModel):
-    name: str
-    description: str
-    type: Literal["counter", "gauge", "histogram"]
-    unit: str
+    name: str = Field(description="The name of the metric.")
+    description: str = Field(description="The description of the metric.")
+    type: MetricType = Field(
+        description="The type of the metric. This should be one of the following: counter, gauge, histogram, summary."
+    )
+    unit: str = Field(
+        description="The unit of the metric. Example: 'tasks', 'seconds', 'requests', 'bytes', etc."
+    )
+    tags: List[TagDefinition] = Field(
+        description="The tags of the metric. Example: { 'agent_name': 'agent_1' }"
+    )
 
 
 class Metrics(BaseModel):
     metrics: list[MetricDefinition]
-
-
-class MetricPanelOptions(BaseModel):
-    displayLabels: List[str]
-
-
-class MetricPanel(BaseModel):
-    type: Literal[
-        "graph",
-        "stat",
-        "gauge",
-        "heatmap",
-        "timeseries",
-        "piechart",
-        "barchart",
-        "bargauge",
-    ]
-    expression: str
-    legend_format: str
-    options: Optional[MetricPanelOptions] = None
 
 
 class MetricValue(BaseModel):
@@ -83,10 +80,20 @@ class Metric(BaseModel):
     values: List[CounterValue | GaugeValue | HistogramValue | SummaryValue]
 
 
+class MetricValues(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    values: List[CounterValue | GaugeValue | HistogramValue | SummaryValue]
+
+
 class MetricCalculatorUpdate(BaseModel):
-    metric_name: str
-    value: float
-    agent_name: str
+    name: str = Field(description="The name of the metric.")
+    value: CounterValue | GaugeValue | HistogramValue | SummaryValue = Field(
+        description="The value of the metric based on metric type."
+    )
+    tags: List[Tag] = Field(
+        description="The tags of the metric based on the metric definition. Example: { 'agent_name': 'agent_1' }"
+    )
     thinking_process: str
 
 
@@ -97,6 +104,7 @@ class MetricCalculator(BaseModel):
 class MetricResponse(BaseModel):
     name: str
     description: str
-    type: Literal["counter", "gauge", "histogram"]
+    type: MetricType
     unit: str
-    value: float = Field(default=0.0)
+    tags: List[TagDefinition]
+    values: List[CounterValue | GaugeValue | HistogramValue | SummaryValue]

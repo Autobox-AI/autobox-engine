@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 def prompt(task: str, agents: str, metrics: str) -> str:
     return f"""
 <objective>
@@ -24,6 +27,8 @@ There are 4 types of metrics:
 - METRICS DEFINITIONS: ${metrics}
 - CURRENT METRICS VALUES: this is provided as user message
 - CONVERSATION HISTORY: this is provided as user message and it is the history of the conversation between the agents.
+- SIMULATION PROGRESS: this is provided as user message and it is the progress of the simulation.
+- HUMAN USER INSTRUCTIONS: If present, this has more priority than anything else except if the simulation progress is 100 or there is no user instruction at all.
 </input>
 
 <labels>
@@ -37,6 +42,8 @@ If a metric is updated and it has labels, you should provide its label(s) key-va
 - The values updates of the metrics must be based on the type of the metric. Keep in mind the following operations by type so your output is correct.
 - You must to cover all the metrics.
 </rules>
+
+IMPORTANT: For time referece the current date and time is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}.
 
 <output>
 You should output based on the schema I provide you. If there are no updates, you should return an empty array for metrics_updates.

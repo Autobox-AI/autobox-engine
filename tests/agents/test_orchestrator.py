@@ -149,10 +149,18 @@ class TestOrchestratorMessageHandling:
 
         mock_metric1 = Mock()
         mock_metric1.name = "metric1"
+        mock_metric1.description = "Test metric 1"
+        mock_metric1.type = "COUNTER"  # Use uppercase
+        mock_metric1.unit = "count"
+        mock_metric1.tags = []  # Add empty tags list
         mock_metric1.model_dump.return_value = {"name": "metric1", "type": "test"}
 
         mock_metric2 = Mock()
         mock_metric2.name = "metric2"
+        mock_metric2.description = "Test metric 2"
+        mock_metric2.type = "GAUGE"  # Use uppercase
+        mock_metric2.unit = "percent"
+        mock_metric2.tags = []  # Add empty tags list
         mock_metric2.model_dump.return_value = {"name": "metric2", "type": "test"}
 
         mock_metrics = [mock_metric1, mock_metric2]

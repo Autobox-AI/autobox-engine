@@ -1,7 +1,17 @@
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
+
+from autobox.schemas.metrics import (
+    CounterValue,
+    GaugeValue,
+    HistogramValue,
+    MetricType,
+    SummaryValue,
+    Tag,
+    TagDefinition,
+)
 
 
 class SimulationStatus(str, Enum):
@@ -25,3 +35,32 @@ class SimulationResponse(BaseModel):
     summary: Optional[str] = None
     last_updated: str
     error: Optional[str] = None
+
+
+class MetricValueMessage(BaseModel):
+    value: CounterValue | GaugeValue | HistogramValue | SummaryValue
+    tags: List[Tag]
+
+
+class MetricResponse(BaseModel):
+    name: str
+    description: str
+    type: MetricType
+    unit: str
+    tags: List[TagDefinition]
+    values: List[MetricValueMessage]
+
+
+class MetricsResponse(BaseModel):
+    model_config = ConfigDict(exclude_none=True)
+
+    metrics: List[MetricResponse]
+    unit: str
+    tags: List[TagDefinition]
+    values: List[MetricValueMessage]
+
+
+class MetricsResponse(BaseModel):
+    model_config = ConfigDict(exclude_none=True)
+
+    metrics: List[MetricResponse]

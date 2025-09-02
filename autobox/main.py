@@ -96,6 +96,8 @@ async def main():
     app_logger.info(f"📝 SIMULATION ID: {simulation_id}")
     app_logger.info("🔍 Check status with:")
     app_logger.info(f"   curl http://localhost:{config.server.port}/status")
+    app_logger.info("📊 Check metrics with:")
+    app_logger.info(f"   curl http://localhost:{config.server.port}/metrics")
     app_logger.info("=" * 60)
 
     runner = Runner(simulator=simulator)

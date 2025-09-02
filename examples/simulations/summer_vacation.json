@@ -10,7 +10,7 @@
             "max_size": 400
         },
         "llm": {
-            "model": "o4-mini"
+            "model": "gpt-5-nano"
         }
     },
     "reporter": {
@@ -19,7 +19,7 @@
             "max_size": 400
         },
         "llm": {
-            "model": "o4-mini"
+            "model": "gpt-5-nano"
         }
     },
     "planner": {
@@ -28,7 +28,7 @@
             "max_size": 400
         },
         "llm": {
-            "model": "o4-mini"
+            "model": "gpt-5-nano"
         }
     },
     "orchestrator": {
@@ -37,7 +37,7 @@
             "max_size": 400
         },
         "llm": {
-            "model": "o4-mini"
+            "model": "gpt-5-nano"
         }
     },
     "workers": [
