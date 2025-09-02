@@ -12,7 +12,7 @@ from autobox.schemas.message import (
     SimulationSignal,
 )
 
-STATUS_CHECK_TIMEOUT_SECONDS = 5
+STATUS_CHECK_TIMEOUT_SECONDS = 15
 
 
 class ActorManager:
