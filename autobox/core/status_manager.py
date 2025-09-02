@@ -67,6 +67,9 @@ class StatusManager:
         self._running = False
         self._lock = asyncio.Lock()
 
+        self.backoff_multiplier = 1.0
+        self.max_backoff_multiplier = 5.0
+
     async def start_monitoring(self, interval: float = 1.0) -> None:
         """Start the centralized monitoring loop.
 
@@ -79,6 +82,7 @@ class StatusManager:
                 return
 
             self._running = True
+            self.base_interval = interval
             self.logger.info(f"Starting status monitoring with {interval}s interval")
             self._monitor_task = asyncio.create_task(self._monitor_loop(interval))
 
@@ -103,13 +107,20 @@ class StatusManager:
         """Main monitoring loop that polls the orchestrator.
 
         Args:
-            interval: Polling interval in seconds
+            interval: Base polling interval in seconds
         """
         while self._running:
             try:
                 response = await self._fetch_status()
 
                 if response:
+                    if self.backoff_multiplier > 1.0:
+                        self.logger.info(
+                            f"Orchestrator responsive again, resetting backoff "
+                            f"(was {self.backoff_multiplier:.1f}x)"
+                        )
+                    self.backoff_multiplier = 1.0
+
                     await self._update_cache(response)
 
                     if response.status in self.TERMINAL_STATUSES:
@@ -124,7 +135,18 @@ class StatusManager:
             except Exception as e:
                 await self._handle_error(e)
 
-            await asyncio.sleep(interval)
+                old_multiplier = self.backoff_multiplier
+                self.backoff_multiplier = min(
+                    self.backoff_multiplier * 1.5, self.max_backoff_multiplier
+                )
+                if old_multiplier != self.backoff_multiplier:
+                    self.logger.info(
+                        f"Increasing backoff to {self.backoff_multiplier:.1f}x "
+                        f"(next check in {interval * self.backoff_multiplier:.1f}s)"
+                    )
+
+            sleep_time = interval * self.backoff_multiplier
+            await asyncio.sleep(sleep_time)
 
     async def _fetch_status(self) -> Optional[Any]:
         """Fetch status from orchestrator without blocking.
@@ -146,6 +168,9 @@ class StatusManager:
                 raise RuntimeError("Received None response from orchestrator")
 
             self.cache["consecutive_errors"] = 0
+
+            if self.backoff_multiplier > 1.0:
+                self.logger.debug("Status fetch successful, backoff will reset")
 
             return response
 
@@ -173,7 +198,6 @@ class StatusManager:
         """
         old_status = self.cache.get("status")
         old_progress = self.cache.get("progress", 0)
-        metrics = self.cache.get("metrics", [])
 
         self.cache.update(
             {
@@ -182,7 +206,7 @@ class StatusManager:
                 "summary": response.summary,
                 "last_updated": datetime.now().isoformat(),
                 "error": None,
-                "metrics": metrics,
+                "metrics": response.metrics,
             }
         )
 
@@ -208,7 +232,7 @@ class StatusManager:
             self.cache["error"] = str(error)
             await self._notify_subscribers(StatusEvent.ERROR_OCCURRED, error)
 
-        if self.cache["consecutive_errors"] >= 3:
+        if self.cache["consecutive_errors"] >= 10:
             if current_status not in self.TERMINAL_STATUSES:
                 self.logger.error("Too many consecutive errors, stopping monitoring")
             self._running = False
@@ -260,7 +284,7 @@ class StatusManager:
             if status in self.TERMINAL_STATUSES:
                 return status
 
-            if not self._running and self.cache.get("consecutive_errors", 0) >= 3:
+            if not self._running and self.cache.get("consecutive_errors", 0) >= 10:
                 self.cache["status"] = SimulationStatus.STOPPED
                 return SimulationStatus.STOPPED
 

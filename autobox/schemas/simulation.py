@@ -55,12 +55,3 @@ class MetricsResponse(BaseModel):
     model_config = ConfigDict(exclude_none=True)
 
     metrics: List[MetricResponse]
-    unit: str
-    tags: List[TagDefinition]
-    values: List[MetricValueMessage]
-
-
-class MetricsResponse(BaseModel):
-    model_config = ConfigDict(exclude_none=True)
-
-    metrics: List[MetricResponse]

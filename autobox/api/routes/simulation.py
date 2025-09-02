@@ -1,12 +1,13 @@
 """Simulation status and control endpoints."""
 
-from typing import List
-
 from fastapi import APIRouter, Request, Response, status
 
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.message import MetricMessage
-from autobox.schemas.simulation import MetricsResponse, SimulationResponse
+from autobox.schemas.simulation import (
+    MetricResponse,
+    MetricsResponse,
+    SimulationResponse,
+)
 
 router = APIRouter(tags=["simulation"])
 logger = LoggerManager.get_server_logger()
@@ -70,8 +71,23 @@ async def abort_simulation(request: Request) -> Response:
 
 
 @router.get("/metrics", response_model=MetricsResponse)
-async def get_metrics(request: Request) -> List[MetricMessage]:
+async def get_metrics(request: Request) -> MetricsResponse:
     """Get metrics from cache."""
     cache = request.app.state.simulation_cache
 
-    return MetricsResponse(metrics=cache["metrics"])
+    metric_messages = cache.get("metrics", [])
+    metric_responses = []
+
+    for msg in metric_messages:
+        metric_responses.append(
+            MetricResponse(
+                name=msg.name,
+                description=msg.description,
+                type=msg.type,
+                unit=msg.unit,
+                tags=msg.tags,
+                values=msg.values,
+            )
+        )
+
+    return MetricsResponse(metrics=metric_responses)
