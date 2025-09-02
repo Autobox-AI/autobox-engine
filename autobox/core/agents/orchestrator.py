@@ -47,6 +47,11 @@ class Orchestrator(BaseAgent):
         self.metrics_values: List[MetricMessage] = []
         self.metrics_definitions: Dict[str, MetricDefinition] = {}
 
+        # Status snapshot for fast responses
+        self.status_snapshot = SimulationMessage(
+            status=SimulationStatus.NEW, progress=0, summary="", metrics=[]
+        )
+
     def receiveMessage(self, message, sender):
         """Main message handler - delegates to specific handlers based on message type."""
 
@@ -90,22 +95,24 @@ class Orchestrator(BaseAgent):
             ),
         )
 
+    def _update_status_snapshot(self):
+        """Update the cached status snapshot with current state."""
+        self.status_snapshot = SimulationMessage(
+            status=self.simulation_status or SimulationStatus.NEW,
+            progress=self.simulation_progress,
+            summary=self.simulation_summary or "",
+            metrics=self.metrics_values,
+        )
+
     def _handle_metrics_message(self, message: MetricsMessage):
         """Handle metrics message."""
         self.metrics_values = message.metrics
+        self._update_status_snapshot()
 
     def _handle_simulation_signal(self, sender):
-        """Send current simulation status to requestor."""
+        """Send current simulation status to requestor - returns cached snapshot immediately."""
+        self.send(sender, self.status_snapshot)
         self.send(self.addresses["evaluator"], MetricsSignal())
-        self.send(
-            sender,
-            SimulationMessage(
-                status=self.simulation_status,
-                progress=self.simulation_progress,
-                summary=self.simulation_summary,
-                metrics=self.metrics_values,
-            ),
-        )
 
     def _handle_signal_message(self, message, sender):
         """Process various signal messages."""
@@ -126,6 +133,7 @@ class Orchestrator(BaseAgent):
         """Start the simulation."""
         self.status = ActorStatus.RUNNING
         self.simulation_status = SimulationStatus.STARTED
+        self._update_status_snapshot()
         self.logger.info("Orchestrator starting...")
 
         self.send(
@@ -154,6 +162,7 @@ class Orchestrator(BaseAgent):
         self.send(self.myAddress, ActorExitRequest())
         self.status = ActorStatus.STOPPED
         self.simulation_status = SimulationStatus.STOPPED
+        self._update_status_snapshot()
         self.logger.info("Orchestrator stopped all agents")
         self.send(
             sender,
@@ -169,6 +178,7 @@ class Orchestrator(BaseAgent):
         )
         self.status = ActorStatus.ABORTED
         self.simulation_status = SimulationStatus.ABORTED
+        self._update_status_snapshot()
 
     def _handle_unknown_signal(self, message):
         """Handle unknown signal."""
@@ -219,6 +229,7 @@ class Orchestrator(BaseAgent):
         self.simulation_status = SimulationStatus.COMPLETED
         self.simulation_progress = 100
         self.simulation_summary = message.content
+        self._update_status_snapshot()
 
         self.logger.info("Stopping all agents after simulation completion...")
         for agent_name, agent_address in self.addresses.items():
@@ -249,6 +260,7 @@ class Orchestrator(BaseAgent):
 
         self.simulation_status = planner_output.status
         self.simulation_progress = planner_output.progress
+        self._update_status_snapshot()
 
         self._distribute_instructions(planner_output.instructions)
 
@@ -273,6 +285,7 @@ class Orchestrator(BaseAgent):
     def _initiate_reporting(self):
         """Start the reporting phase."""
         self.simulation_status = SimulationStatus.SUMMARIZING
+        self._update_status_snapshot()
         self.send(
             self.addresses["reporter"],
             Message(
@@ -300,6 +313,7 @@ class Orchestrator(BaseAgent):
         self.id = message.agent_ids_by_name["orchestrator"]
         self.simulation_id = self.id
         self.simulation_status = SimulationStatus.NEW
+        self._update_status_snapshot()
 
         workers_info = json.dumps(
             [
