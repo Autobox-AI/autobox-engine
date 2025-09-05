@@ -1,10 +1,11 @@
 from autobox.actor.manager import ActorManager
 from autobox.bootstrap.id import create_ids_by_name
-from autobox.core.status_manager import StatusEvent, StatusManager
+from autobox.core.cache import CacheManager, StatusEvent
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.actor import Actor, ActorName, ActorStatus
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import Config
 from autobox.schemas.message import InitOrchestrator, Signal, SignalMessage, Status
+from autobox.schemas.simulation import SimulationStatus
 
 POLL_INTERVAL_SECONDS = 1
 STATUS_CHECK_TIMEOUT_SECONDS = 5
@@ -22,10 +23,9 @@ class Simulator:
     def __init__(self, config: Config):
         self.config = config
         self.logger = LoggerManager.get_runner_logger()
-        self.orchestrator: Actor = None
         self.agent_ids_by_name = create_ids_by_name(self.config.simulation.workers)
         self.actor_manager = ActorManager(agent_ids_by_name=self.agent_ids_by_name)
-        self.status_manager = StatusManager(self.actor_manager)
+        self.cache_manager = CacheManager(self.actor_manager)
 
     async def run(self):
         self.init()
@@ -34,23 +34,23 @@ class Simulator:
 
         self.logger.info("Simulation started")
 
-        self.status_manager.subscribe(
+        self.cache_manager.subscribe(
             StatusEvent.STATUS_CHANGED, self._on_status_changed
         )
-        self.status_manager.subscribe(StatusEvent.ERROR_OCCURRED, self._on_error)
+        self.cache_manager.subscribe(StatusEvent.ERROR_OCCURRED, self._on_error)
 
-        await self.status_manager.start_monitoring(POLL_INTERVAL_SECONDS)
+        await self.cache_manager.start_monitoring(POLL_INTERVAL_SECONDS)
 
         try:
             timeout = self.config.simulation.timeout_seconds
-            final_status = await self.status_manager.wait_for_completion(timeout)
+            final_status = await self.cache_manager.wait_for_completion(timeout)
             self.logger.info(f"Simulation completed with status: {final_status.value}")
         except TimeoutError:
             self.logger.warning(
                 f"Simulation timeout after {self.config.simulation.timeout_seconds}s"
             )
         finally:
-            await self.status_manager.stop_monitoring()
+            await self.cache_manager.stop_monitoring()
 
         self.stop_the_world()
 
@@ -58,10 +58,8 @@ class Simulator:
 
     def _on_status_changed(self, response):
         """Callback for status change events."""
-        self.logger.info(
-            f"Status changed to: {response.status.value} "
-            f"(Progress: {response.progress}%)"
-        )
+        # No longer logging here - CacheManager handles status change logging
+        pass
 
     def _on_error(self, error):
         """Callback for error events."""
@@ -76,9 +74,11 @@ class Simulator:
         return response
 
     def init(self):
-        self.actor_manager.ask(
+        self.actor_manager.ask_orchestrator(
             InitOrchestrator(
-                config=self.config, agent_ids_by_name=self.agent_ids_by_name
+                config=self.config,
+                agent_ids_by_name=self.agent_ids_by_name,
+                monitor_actor=self.actor_manager.monitor_actor,
             )
         )
 
@@ -87,7 +87,7 @@ class Simulator:
 
     def _ask_orchestrator(self, signal: Signal) -> Status:
         """Helper method to send messages from SIMULATOR to ORCHESTRATOR"""
-        return self.actor_manager.ask(
+        return self.actor_manager.ask_orchestrator(
             SignalMessage(
                 type=signal,
                 from_agent=ActorName.SIMULATOR,
@@ -121,9 +121,9 @@ class Simulator:
     async def loop_status_until_timeout(self) -> ActorStatus:
         """Legacy method for tests - waits for completion."""
         try:
-            await self.status_manager.start_monitoring(POLL_INTERVAL_SECONDS)
+            await self.cache_manager.start_monitoring(POLL_INTERVAL_SECONDS)
             timeout = self.config.simulation.timeout_seconds
-            final_status = await self.status_manager.wait_for_completion(timeout)
+            final_status = await self.cache_manager.wait_for_completion(timeout)
             status_map = {
                 "completed": ActorStatus.COMPLETED,
                 "failed": ActorStatus.FAILED,
@@ -132,4 +132,4 @@ class Simulator:
             }
             return status_map.get(final_status.value, ActorStatus.UNKNOWN)
         finally:
-            await self.status_manager.stop_monitoring()
+            await self.cache_manager.stop_monitoring()

@@ -53,12 +53,11 @@ class Worker(BaseAgent):
         )
         self.status = ActorStatus.INITIALIZED
         self._send_ack(sender)
-        self.logger.info(f"Worker {self.name} initialized (pid: {os.getpid()})")
+        self.logger.info(f"worker {self.name} initialized (pid: {os.getpid()})")
 
     def _process_message(self, message, sender):
         """Process incoming message and generate response."""
         self.memory.add_message(message)
-        self.logger.info(f"Worker {self.name} is thinking...")
 
         chat_completion_messages = [
             {

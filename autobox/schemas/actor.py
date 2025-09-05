@@ -12,6 +12,7 @@ class ActorName(str, Enum):
     WORKER = "worker"
     SERVER = "server"
     SIMULATOR = "simulator"
+    MONITOR = "monitor"
 
 
 class ActorStatus(str, Enum):

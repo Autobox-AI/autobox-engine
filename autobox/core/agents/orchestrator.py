@@ -1,8 +1,8 @@
 import json
 import os
-from typing import Dict, List
+from typing import Dict
 
-from thespian.actors import ActorAddress, ActorExitRequest
+from thespian.actors import ActorAddress, ActorExitRequest, ChildActorExited
 
 from autobox.bootstrap.metrics import generate_metrics
 from autobox.core.agents.base import BaseAgent
@@ -13,22 +13,22 @@ from autobox.core.agents.worker import Worker
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     Ack,
-    EvaluatorMessageContent,
+    EvaluationMessage,
     InitAgent,
     InitEvaluator,
+    InitMonitor,
     InitOrchestrator,
     InitPlanner,
     InitReporter,
     InstructionMessage,
     Message,
-    MetricMessage,
+    Metric,
     MetricsMessage,
-    MetricsSignal,
+    ReportMessage,
     Signal,
     SignalMessage,
-    SimulationMessage,
-    SimulationSignal,
     Status,
+    StatusUpdateMessage,
 )
 from autobox.schemas.metrics import MetricDefinition, TagDefinition
 from autobox.schemas.planner import PlannerOutput
@@ -44,21 +44,14 @@ class Orchestrator(BaseAgent):
         self.simulation_summary = None
         self.simulation_status: SimulationStatus = None
         self.name: str = ActorName.ORCHESTRATOR.value
-        self.metrics_values: List[MetricMessage] = []
+        self.metrics_values: Dict[str, Metric] = {}
         self.metrics_definitions: Dict[str, MetricDefinition] = {}
-
-        # Status snapshot for fast responses
-        self.status_snapshot = SimulationMessage(
-            status=SimulationStatus.NEW, progress=0, summary="", metrics=[]
-        )
 
     def receiveMessage(self, message, sender):
         """Main message handler - delegates to specific handlers based on message type."""
 
         if isinstance(message, InitOrchestrator):
             self.handle_init(sender, message)
-        elif isinstance(message, SimulationSignal):
-            self._handle_simulation_signal(sender)
         elif isinstance(message, MetricsMessage):
             self._handle_metrics_message(message)
         elif isinstance(message, SignalMessage):
@@ -67,52 +60,49 @@ class Orchestrator(BaseAgent):
             self._handle_instruction_message(message)
         elif isinstance(message, Message):
             self._handle_agent_message(message)
-        elif isinstance(message, ActorExitRequest):
+        elif isinstance(message, ActorExitRequest) or isinstance(
+            message, ChildActorExited
+        ):
             pass  # Normal exit request
         else:
-            self.logger.info(
-                f"Orchestrator received unknown message from {sender}: {message}"
-            )
+            self._log_unknown_message(message)
 
     def stop_the_world(self):
-        self.logger.info("Orchestrator stopping all agents...")
         self.send(self.myAddress, ActorExitRequest())
         self.status = ActorStatus.STOPPED
         self.logger.info("Orchestrator stopped all agents")
 
     def _evaluate(self):
         """Send message to evaluator."""
-        content = EvaluatorMessageContent(
-            history=self.memory.get_history_str(),
-            progress=self.simulation_progress,
-        )
         self.send(
             self.addresses["evaluator"],
-            Message(
+            EvaluationMessage(
                 from_agent=self.name,
                 to_agent=ActorName.EVALUATOR,
-                content=json.dumps(content.model_dump()),
+                history=self.memory.get_history_str(),
+                progress=self.simulation_progress,
             ),
         )
 
     def _update_status_snapshot(self):
-        """Update the cached status snapshot with current state."""
-        self.status_snapshot = SimulationMessage(
-            status=self.simulation_status or SimulationStatus.NEW,
-            progress=self.simulation_progress,
-            summary=self.simulation_summary or "",
-            metrics=self.metrics_values,
+        """Push current state to Monitor."""
+
+        self.send(
+            self.monitor,
+            StatusUpdateMessage(
+                status=self.simulation_status or SimulationStatus.NEW,
+                progress=self.simulation_progress,
+                summary=self.simulation_summary,
+                metrics=list(self.metrics_values.values())
+                if self.metrics_values
+                else [],
+            ),
         )
 
     def _handle_metrics_message(self, message: MetricsMessage):
         """Handle metrics message."""
         self.metrics_values = message.metrics
         self._update_status_snapshot()
-
-    def _handle_simulation_signal(self, sender):
-        """Send current simulation status to requestor - returns cached snapshot immediately."""
-        self.send(sender, self.status_snapshot)
-        self.send(self.addresses["evaluator"], MetricsSignal())
 
     def _handle_signal_message(self, message, sender):
         """Process various signal messages."""
@@ -148,7 +138,8 @@ class Orchestrator(BaseAgent):
 
     def _handle_ack_signal(self, message):
         """Handle acknowledgment signal."""
-        self.logger.info(f"{message.from_agent} acknowledged: {message.content}")
+        # self.logger.info(f"{message.from_agent} acknowledged: {message.content}")
+        pass
 
     def _handle_status_signal(self, sender):
         """Send status to requestor."""
@@ -164,6 +155,7 @@ class Orchestrator(BaseAgent):
         self.simulation_status = SimulationStatus.STOPPED
         self._update_status_snapshot()
         self.logger.info("Orchestrator stopped all agents")
+
         self.send(
             sender,
             Status(
@@ -196,9 +188,6 @@ class Orchestrator(BaseAgent):
                 content=message.content,
             ),
         )
-        self.logger.info(
-            f"Orchestrator received instruction from {message.agent_name}: {message.content}"
-        )
 
     def _handle_agent_message(self, message):
         """Process messages from agents."""
@@ -224,14 +213,12 @@ class Orchestrator(BaseAgent):
 
     def _handle_reporter_completion(self, message):
         """Handle completion message from reporter."""
-        self.logger.info("Orchestrator is completing...")
         self.status = ActorStatus.COMPLETED
         self.simulation_status = SimulationStatus.COMPLETED
         self.simulation_progress = 100
         self.simulation_summary = message.content
         self._update_status_snapshot()
 
-        self.logger.info("Stopping all agents after simulation completion...")
         for agent_name, agent_address in self.addresses.items():
             self.send(
                 agent_address,
@@ -239,19 +226,14 @@ class Orchestrator(BaseAgent):
                     from_agent=self.name, to_agent=agent_name, type=Signal.STOP
                 ),
             )
-        self.logger.info("All agents have been sent STOP signals")
 
     def _handle_planner_message(self, message):
         """Process plan from planner."""
         planner_output = PlannerOutput.model_validate_json(message.content)
-        self.logger.info(
-            f"Orchestrator received plan with {len(planner_output.instructions)} "
-            f"instructions: {planner_output.thinking_process}"
-        )
 
         for instruction in planner_output.instructions:
             self.logger.info(
-                f"Instructions for: {instruction.agent_name}: {instruction.instruction}"
+                f"Instructions for [{instruction.agent_name}]: {instruction.instruction}"
             )
 
         if planner_output.status == SimulationStatus.COMPLETED:
@@ -262,13 +244,11 @@ class Orchestrator(BaseAgent):
         self.simulation_progress = planner_output.progress
         self._update_status_snapshot()
 
-        self._distribute_instructions(planner_output.instructions)
+        self._dispach_instructions(planner_output.instructions)
 
     def _handle_worker_message(self, message):
         """Process message from worker agent."""
-        self.logger.info(
-            f"Orchestrator received message from {message.from_agent}: {message.content}"
-        )
+        self.logger.info(f"Message from [{message.from_agent}]: {message.content}")
 
         if self.memory.has_pending():
             return
@@ -288,15 +268,14 @@ class Orchestrator(BaseAgent):
         self._update_status_snapshot()
         self.send(
             self.addresses["reporter"],
-            Message(
-                from_agent=self.name,
-                to_agent=ActorName.REPORTER,
-                content=self.memory.get_history_between_worker_str(),
+            ReportMessage(
+                history=self.memory.get_history_between_worker_str(),
+                metrics=self.metrics_values,
             ),
         )
         self.memory.add_pending("reporter")
 
-    def _distribute_instructions(self, instructions):
+    def _dispach_instructions(self, instructions):
         """Send instructions to respective agents."""
         for instruction in instructions:
             self.send(
@@ -313,7 +292,7 @@ class Orchestrator(BaseAgent):
         self.id = message.agent_ids_by_name["orchestrator"]
         self.simulation_id = self.id
         self.simulation_status = SimulationStatus.NEW
-        self._update_status_snapshot()
+        self.monitor = message.monitor_actor
 
         workers_info = json.dumps(
             [
@@ -355,6 +334,20 @@ class Orchestrator(BaseAgent):
             metric.name: metric for metric in metrics_definitions
         }
 
+        self.metrics_values = {
+            metric.name: Metric(
+                name=metric.name,
+                description=metric.description,
+                type=metric.type,
+                unit=metric.unit,
+                tags=metric.tags,
+                values=[],
+            )
+            for metric in metrics_definitions
+        }
+
+        self._update_status_snapshot()
+
         worker_configs_by_name = message.config.get_worker_configs_by_name()
         self.planner = self.createActor(Planner, globalName="planner")
         self.evaluator = self.createActor(Evaluator, globalName="evaluator")
@@ -363,7 +356,9 @@ class Orchestrator(BaseAgent):
             worker.name: self.createActor(Worker, globalName=worker.name)
             for worker in message.config.simulation.workers
         }
+
         self.addresses = {
+            "monitor": self.monitor,
             "planner": self.planner,
             "evaluator": self.evaluator,
             "reporter": self.reporter,
@@ -378,6 +373,15 @@ class Orchestrator(BaseAgent):
                 }
                 for worker in message.config.simulation.workers
             ]
+        )
+
+        self.send(
+            self.monitor,
+            InitMonitor(
+                task=message.config.simulation.task,
+                config=message.config.simulation.planner,  # TODO
+                id=message.agent_ids_by_name["monitor"],
+            ),
         )
 
         self.send(
@@ -397,6 +401,7 @@ class Orchestrator(BaseAgent):
                 id=message.agent_ids_by_name["evaluator"],
                 workers_info=workers_info,
                 metrics_definitions=metrics_definitions,
+                metrics_values=self.metrics_values,
             ),
         )
         self.send(
@@ -420,4 +425,4 @@ class Orchestrator(BaseAgent):
 
         self.status = ActorStatus.INITIALIZED
         self.send(sender, Ack(from_agent=self.name, to_agent="simulator"))
-        self.logger.info(f"Orchestrator initialized (pid: {os.getpid()})")
+        self.logger.info(f"orchestrator initialized (pid: {os.getpid()})")

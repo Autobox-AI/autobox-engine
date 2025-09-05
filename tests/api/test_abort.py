@@ -25,11 +25,11 @@ class TestAbortFunctionality:
         mock_actor_manager = MagicMock()
         # abort_simulation now returns None (uses tell instead of ask)
         mock_actor_manager.abort_simulation.return_value = None
-        
-        mock_status_manager = MagicMock()
-        mock_status_manager.actor_manager = mock_actor_manager
 
-        app = create_app(mock_status_manager)
+        mock_cache_manager = MagicMock()
+        mock_cache_manager.actor_manager = mock_actor_manager
+
+        app = create_app(mock_cache_manager)
         client = TestClient(app)
 
         response = client.post("/abort")
@@ -49,11 +49,11 @@ class TestAbortFunctionality:
         mock_actor_manager.abort_simulation.side_effect = RuntimeError(
             "Actor not found"
         )
-        
-        mock_status_manager = MagicMock()
-        mock_status_manager.actor_manager = mock_actor_manager
 
-        app = create_app(mock_status_manager)
+        mock_cache_manager = MagicMock()
+        mock_cache_manager.actor_manager = mock_actor_manager
+
+        app = create_app(mock_cache_manager)
         client = TestClient(app)
 
         response = client.post("/abort")

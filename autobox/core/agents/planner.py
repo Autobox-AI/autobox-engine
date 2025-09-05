@@ -1,3 +1,5 @@
+import json
+
 from thespian.actors import ActorAddress
 
 from autobox.core.agents.base import BaseAgent
@@ -40,18 +42,17 @@ class Planner(BaseAgent):
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
 
-    def plan(self, sender: ActorAddress, user_prompt: str = None):
+    def plan(self, sender: ActorAddress, conversation_history: str = None):
         """Generate a plan based on the current context."""
-        self.logger.info("Planning...")
 
         chat_completion_messages = [
             {
                 "role": "user",
-                "content": f"TASK PLANNER HISTORY: {self.memory.model_dump_json()}",
+                "content": f"TASK PLANNER HISTORY: {json.dumps(self.memory.internal)}",
             },
             {
                 "role": "user",
-                "content": f"CONVERSATION HISTORY: {user_prompt if user_prompt else ''}",
+                "content": f"CONVERSATION HISTORY: {conversation_history if conversation_history else ''}",
             },
             {
                 "role": "user",
@@ -62,7 +63,9 @@ class Planner(BaseAgent):
         completion = self.llm.think(chat_completion_messages, schema=PlannerOutput)
 
         planner_output: PlannerOutput = completion.choices[0].message.parsed
-        self.logger.info(f"Planning: {planner_output.thinking_process}")
+        self.logger.info(f"Planner reasoning: {planner_output.thinking_process}")
+
+        self.memory.add_internal(json.dumps(planner_output.model_dump()))
 
         self.send(
             sender,

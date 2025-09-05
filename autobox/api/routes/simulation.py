@@ -3,11 +3,8 @@
 from fastapi import APIRouter, Request, Response, status
 
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.simulation import (
-    MetricResponse,
-    MetricsResponse,
-    SimulationResponse,
-)
+from autobox.schemas.cache import StatusCache
+from autobox.schemas.simulation import SimulationResponse
 
 router = APIRouter(tags=["simulation"])
 logger = LoggerManager.get_server_logger()
@@ -23,15 +20,19 @@ async def get_status(request: Request) -> SimulationResponse:
     Returns:
         SimulationResponse: Current simulation status from cache
     """
-    logger.info("Simulation status requested.")
-    cache = request.app.state.simulation_cache
+    cache_manager = request.app.state.cache_manager
+    cache: StatusCache = (
+        cache_manager.get_status()
+        if cache_manager
+        else request.app.state.simulation_cache
+    )
 
     return SimulationResponse(
-        status=cache.get("status", "unknown"),
-        progress=cache.get("progress", 0),
-        summary=cache.get("summary"),
-        last_updated=cache.get("last_updated"),
-        error=cache.get("error"),
+        status=cache.status,
+        progress=cache.progress,
+        summary=cache.summary,
+        last_updated=cache.last_updated.isoformat(),
+        error=cache.error,
     )
 
 
@@ -48,15 +49,13 @@ async def abort_simulation(request: Request) -> Response:
     Returns:
         Response: 202 Accepted status
     """
-    logger.info("Abort simulation requested.")
-
-    status_manager = request.app.state.status_manager
-    if not status_manager or not status_manager.actor_manager:
+    cache_manager = request.app.state.cache_manager
+    if not cache_manager or not cache_manager.actor_manager:
         logger.warning("Status manager not initialized, cannot abort.")
         return Response(status_code=status.HTTP_202_ACCEPTED)
 
     try:
-        status_manager.actor_manager.abort_simulation()
+        cache_manager.actor_manager.abort_simulation()
 
         cache = request.app.state.simulation_cache
         cache["status"] = "aborting"
@@ -70,24 +69,15 @@ async def abort_simulation(request: Request) -> Response:
     return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
-@router.get("/metrics", response_model=MetricsResponse)
-async def get_metrics(request: Request) -> MetricsResponse:
-    """Get metrics from cache."""
-    cache = request.app.state.simulation_cache
-
-    metric_messages = cache.get("metrics", [])
-    metric_responses = []
-
-    for msg in metric_messages:
-        metric_responses.append(
-            MetricResponse(
-                name=msg.name,
-                description=msg.description,
-                type=msg.type,
-                unit=msg.unit,
-                tags=msg.tags,
-                values=msg.values,
-            )
-        )
-
-    return MetricsResponse(metrics=metric_responses)
+@router.get("/metrics")
+async def get_metrics(request: Request):
+    """Get metrics from cache - returns raw metrics data."""
+    cache_manager = request.app.state.cache_manager
+    cache = (
+        cache_manager.get_status()
+        if cache_manager
+        else request.app.state.simulation_cache
+    )
+    metric_messages = cache.metrics if hasattr(cache, "metrics") else []
+    # TODO: define proper response schema and transformation, we return the raw data for now
+    return {"metrics": metric_messages}

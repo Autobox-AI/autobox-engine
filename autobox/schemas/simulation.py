@@ -37,7 +37,7 @@ class SimulationResponse(BaseModel):
     error: Optional[str] = None
 
 
-class MetricValueMessage(BaseModel):
+class MetricValue(BaseModel):
     value: CounterValue | GaugeValue | HistogramValue | SummaryValue
     tags: List[Tag]
 
@@ -48,7 +48,7 @@ class MetricResponse(BaseModel):
     type: MetricType
     unit: str
     tags: List[TagDefinition]
-    values: List[MetricValueMessage]
+    values: List[MetricValue]
 
 
 class MetricsResponse(BaseModel):

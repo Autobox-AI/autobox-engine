@@ -9,6 +9,7 @@ def create_ids_by_name(workers: List[WorkerConfig]) -> dict:
     evaluator_id = str(uuid.uuid4())
     planner_id = str(uuid.uuid4())
     reporter_id = str(uuid.uuid4())
+    monitor_id = str(uuid.uuid4())
     worker_ids_by_name = {worker.name: str(uuid.uuid4()) for worker in workers}
 
     agent_ids = {
@@ -16,6 +17,7 @@ def create_ids_by_name(workers: List[WorkerConfig]) -> dict:
         "evaluator": evaluator_id,
         "planner": planner_id,
         "reporter": reporter_id,
+        "monitor": monitor_id,
         **{worker.name: worker_ids_by_name[worker.name] for worker in workers},
     }
 

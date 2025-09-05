@@ -7,14 +7,13 @@ from autobox.core.agents.base import BaseAgent
 from autobox.core.prompts.evaluator import prompt as system_prompt
 from autobox.schemas.actor import ActorName
 from autobox.schemas.message import (
-    EvaluatorMessageContent,
+    EvaluationMessage,
     InitEvaluator,
     InstructionMessage,
-    Message,
-    MetricMessage,
+    Metric,
     MetricsMessage,
     MetricsSignal,
-    MetricValueMessage,
+    MetricValue,
     Signal,
     SignalMessage,
 )
@@ -24,7 +23,7 @@ from autobox.schemas.metrics import MetricCalculator, MetricDefinition
 class Evaluator(BaseAgent):
     def __init__(self):
         super().__init__(name=ActorName.EVALUATOR.value)
-        self.metrics_values: Dict[str, MetricMessage] = {}
+        self.metrics_values: Dict[str, Metric] = {}
         self.metrics_definitions: List[MetricDefinition] = []
 
     def receiveMessage(self, message, sender):
@@ -45,17 +44,7 @@ class Evaluator(BaseAgent):
                     }
                 ),
             )
-            self.metrics_values = {
-                metric.name: MetricMessage(
-                    name=metric.name,
-                    description=metric.description,
-                    type=metric.type,
-                    unit=metric.unit,
-                    tags=metric.tags,
-                    values=[],
-                )
-                for metric in message.metrics_definitions
-            }
+            self.metrics_values = message.metrics_values
         elif isinstance(message, InstructionMessage):
             self._handle_instruction(message)
         elif isinstance(message, MetricsSignal):
@@ -63,20 +52,18 @@ class Evaluator(BaseAgent):
         elif isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
                 self._handle_stop_signal()
-        elif isinstance(message, Message):
+        elif isinstance(message, EvaluationMessage):
             self.memory.add_message(message)
-            content = EvaluatorMessageContent.model_validate_json(message.content)
-            self._evaluate(content)
+            self._evaluate(sender, message)
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
 
     def _handle_metrics_signal(self, sender: ActorAddress):
-        self.send(sender, MetricsMessage(metrics=list(self.metrics_values.values())))
+        self.send(sender, list(self.metrics_values.values()))
 
-    def _evaluate(self, content: EvaluatorMessageContent):
+    def _evaluate(self, sender: ActorAddress, message: EvaluationMessage):
         """Evaluate the current context."""
-        self.logger.info("Evaluating...")
 
         chat_completion_messages = [
             {
@@ -85,11 +72,11 @@ class Evaluator(BaseAgent):
             },
             {
                 "role": "user",
-                "content": f"CONVERSATION HISTORY: {content.history}",
+                "content": f"CONVERSATION HISTORY: {message.history}",
             },
             {
                 "role": "user",
-                "content": f"SIMULATION PROGRESS: {content.progress}",
+                "content": f"SIMULATION PROGRESS: {message.progress}",
             },
             {
                 "role": "user",
@@ -103,7 +90,9 @@ class Evaluator(BaseAgent):
 
         for metric_update in metrics_update.update:
             self.metrics_values[metric_update.name].values.append(
-                MetricValueMessage(value=metric_update.value, tags=metric_update.tags)
+                MetricValue(value=metric_update.value, tags=metric_update.tags)
             )
 
         self.logger.info(f"Evaluator updated {len(metrics_update.update)} metrics")
+
+        self.send(sender, MetricsMessage(metrics=self.metrics_values))

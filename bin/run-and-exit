@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=TRUE
 
-# Default simulation name
-SIMULATION_NAME="summer_vacation"
+if [ -d "logs" ]; then
+    rm -f logs/*.log
+fi
 
-# Check if a simulation name argument was provided
+SIMULATION_NAME="gift_choice"
+
 if [ $# -ge 1 ] && [[ ! "$1" =~ ^- ]]; then
     SIMULATION_NAME="$1"
     shift  # Remove the first argument so remaining args can be passed to the python command
 fi
 
-# Construct paths
 CONFIG_PATH="examples/simulations/${SIMULATION_NAME}.json"
 METRICS_PATH="examples/metrics/${SIMULATION_NAME}.json"
 
-# Check if files exist
 if [ ! -f "$CONFIG_PATH" ]; then
     echo "Error: Simulation config file not found: $CONFIG_PATH"
     exit 1

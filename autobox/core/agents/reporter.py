@@ -1,3 +1,5 @@
+import json
+
 from autobox.core.agents.base import BaseAgent
 from autobox.core.prompts.reporter import prompt as system_prompt
 from autobox.schemas.actor import ActorName
@@ -5,6 +7,7 @@ from autobox.schemas.message import (
     InitReporter,
     InstructionMessage,
     Message,
+    ReportMessage,
     Signal,
     SignalMessage,
 )
@@ -28,21 +31,26 @@ class Reporter(BaseAgent):
                 self._handle_stop_signal()
         elif isinstance(message, InstructionMessage):
             self._handle_instruction(message)
-        elif isinstance(message, Message):
+        elif isinstance(message, ReportMessage):
             self._generate_report(message, sender)
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
 
-    def _generate_report(self, message, sender):
+    def _generate_report(self, message: ReportMessage, sender):
         """Generate a report based on conversation history."""
-        self.logger.info("Reporter is summarizing...")
+        self.logger.info("Summarizing...")
+
         self.memory.add_message(message)
 
         chat_completion_messages = [
             {
                 "role": "user",
-                "content": f"CONVERSATION HISTORY: {message.content}",
+                "content": f"CONVERSATION HISTORY: {message.history}",
+            },
+            {
+                "role": "user",
+                "content": f"METRICS: {json.dumps({k: v.model_dump() for k, v in message.metrics.items()})}",
             },
             {
                 "role": "user",

@@ -137,6 +137,7 @@ class TestOrchestratorMessageHandling:
         sender = Mock()
 
         mock_actors = {
+            "monitor": Mock(),
             "planner": Mock(),
             "evaluator": Mock(),
             "reporter": Mock(),
@@ -173,17 +174,18 @@ class TestOrchestratorMessageHandling:
 
         assert orchestrator.id == "orch-123"
         assert orchestrator.status == ActorStatus.INITIALIZED
+        assert orchestrator.addresses["monitor"] == mock_actors["monitor"]
         assert orchestrator.addresses["planner"] == mock_actors["planner"]
         assert orchestrator.addresses["evaluator"] == mock_actors["evaluator"]
         assert orchestrator.addresses["reporter"] == mock_actors["reporter"]
         assert orchestrator.addresses["worker_1"] == mock_actors["worker_1"]
         assert orchestrator.addresses["worker_2"] == mock_actors["worker_2"]
 
-        assert mock_create_actor.call_count == 5
+        assert mock_create_actor.call_count == 6  # Monitor, Planner, Evaluator, Reporter, 2 Workers
 
         assert (
-            orchestrator.send.call_count == 6
-        )  # planner, evaluator, reporter, 2 workers, and ack to sender
+            orchestrator.send.call_count == 7
+        )  # monitor, planner, evaluator, reporter, 2 workers, and ack to sender
 
     def test_start_signal(self, orchestrator):
         """Test handling START signal."""

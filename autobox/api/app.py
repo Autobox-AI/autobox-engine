@@ -5,10 +5,9 @@ from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI
 
-from autobox.api.background import StatusCacheUpdater
 from autobox.api.middleware import setup_cors, setup_logging_filters
 from autobox.api.routes import health_router, instructions_router, simulation_router
-from autobox.core.status_manager import StatusManager
+from autobox.core.cache import CacheManager
 from autobox.logging.logger import LoggerManager
 
 
@@ -25,23 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger = LoggerManager.get_server_logger()
     logger.info("Starting Autobox API server...")
 
-    status_manager = getattr(app.state, "status_manager", None)
-    status_updater = None
-
-    if status_manager:
-        status_updater = StatusCacheUpdater(status_manager, app.state.simulation_cache)
-        await status_updater.start()
-        app.state.status_updater = status_updater
-        logger.info("API connected to centralized status monitoring")
-    else:
-        logger.warning("No status manager provided, running in limited mode")
-
     yield
-
-    logger.info("Shutting down Autobox API server...")
-
-    if status_updater:
-        await status_updater.stop()
 
     logger.info("Autobox API server shutdown complete")
 
@@ -49,11 +32,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 class AutoboxApp:
     """Main application class for managing the FastAPI app and its components."""
 
-    def __init__(self, status_manager: Optional[StatusManager] = None):
+    def __init__(self, cache_manager: Optional[CacheManager] = None):
         """Initialize the Autobox application.
 
         Args:
-            status_manager: Optional centralized status manager for simulation monitoring
+            cache_manager: Optional centralized status manager for simulation monitoring
         """
         self.app = FastAPI(
             title="Autobox API",
@@ -62,7 +45,7 @@ class AutoboxApp:
             lifespan=lifespan,
         )
         self.logger = LoggerManager.get_server_logger()
-        self.status_manager = status_manager
+        self.cache_manager = cache_manager
 
         self._initialize_state()
 
@@ -71,16 +54,9 @@ class AutoboxApp:
 
     def _initialize_state(self) -> None:
         """Initialize application state."""
-        self.app.state.status_manager = self.status_manager
-        self.app.state.simulation_cache = {
-            "status": "initializing",
-            "progress": 0,
-            "summary": None,
-            "last_updated": None,
-            "error": None,
-        }
-        self.app.state.cache_update_task = None
-        self.app.state.status_updater = None
+        self.app.state.cache_manager = self.cache_manager
+        if self.cache_manager:
+            self.app.state.simulation_cache = self.cache_manager.get_status()
 
     def _setup_middleware(self) -> None:
         """Configure middleware for the application."""
@@ -94,14 +70,14 @@ class AutoboxApp:
         self.app.include_router(instructions_router)
 
 
-def create_app(status_manager: Optional[StatusManager] = None) -> FastAPI:
+def create_app(cache_manager: Optional[CacheManager] = None) -> FastAPI:
     """Factory function to create a configured FastAPI application.
 
     Args:
-        status_manager: Optional centralized status manager for simulation monitoring
+        cache_manager: Optional centralized status manager for simulation monitoring
 
     Returns:
         FastAPI: Configured FastAPI application instance
     """
-    autobox_app = AutoboxApp(status_manager)
+    autobox_app = AutoboxApp(cache_manager)
     return autobox_app.app

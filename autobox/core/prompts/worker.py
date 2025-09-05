@@ -33,6 +33,11 @@ This might be:
     You can accept the terms and the agreement proposed by another agent. This will end the process from your side.
 </actions>
 
+** IMPORTANT GUIDELINES:**
+- You MUST do your best to avoid endless loops and cyclical conversation between agents. This mean you MUST not repeat yourself.
+- You MUST to thrive to finish the simulation achieving the final task as soon as possible.
+
+
 Today's date is ${datetime.now(timezone.utc).strftime("%Y-%m-%d")}. It might be helpful info sometimes for some decision-making process.
 
 <output>

@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -11,15 +11,19 @@ class Memory(BaseModel):
     history: List[Message] = Field(
         default=[], description="List of messages between agents"
     )
+    internal: List[str] = Field(default=[], description="List of internal of the agent")
     pending: Dict[str, datetime] = Field(
         default={}, description="List of messages pending to be processed"
     )
 
-    def add_message(self, message: Message):
+    def add_message(self, message: Any):
         self.history.append(message)
 
     def add_pending(self, agent_id: str):
         self.pending[agent_id] = datetime.now()
+
+    def add_internal(self, message: str):
+        self.internal.append(message)
 
     def remove_if_pending(self, agent_id: str):
         if agent_id in self.pending:

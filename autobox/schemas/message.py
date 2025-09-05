@@ -1,8 +1,10 @@
+from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
 from openai import BaseModel
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
+from thespian.actors import ActorAddress
 
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.config import AgentConfig, Config
@@ -92,30 +94,6 @@ class Status(SignalMessage):
         return Signal.STATUS
 
 
-class InitOrchestrator(BaseModel):
-    config: Config
-    agent_ids_by_name: Dict[str, str]
-
-
-class InitAgent(BaseModel):
-    task: str
-    config: AgentConfig
-    id: str
-
-
-class InitPlanner(InitAgent):
-    workers_info: str
-
-
-class InitEvaluator(InitAgent):
-    workers_info: str
-    metrics_definitions: List[MetricDefinition]
-
-
-class InitReporter(InitAgent):
-    workers_info: str
-
-
 class MetricsSignal(SignalMessage):
     type: Signal = Signal.METRICS
     to_agent: str = ActorName.EVALUATOR
@@ -137,24 +115,24 @@ class MetricsSignal(SignalMessage):
         return ActorName.SERVER
 
 
-class MetricValueMessage(BaseModel):
+class MetricValue(BaseModel):
     value: CounterValue | GaugeValue | HistogramValue | SummaryValue
     tags: List[Tag]
 
 
-class MetricMessage(BaseModel):
+class Metric(BaseModel):
     name: str
     description: str
     type: MetricType
     unit: str
     tags: List[TagDefinition]
-    values: List[MetricValueMessage]
+    values: List[MetricValue]
 
 
 class MetricsMessage(BaseMessage):
     from_agent: str = Field(default=ActorName.EVALUATOR)
     to_agent: str = Field(default=ActorName.ORCHESTRATOR)
-    metrics: List[MetricMessage]
+    metrics: Dict[str, Metric]
 
     @field_validator("from_agent", mode="before")
     @classmethod
@@ -167,7 +145,7 @@ class MetricsMessage(BaseMessage):
         return ActorName.ORCHESTRATOR
 
 
-class EvaluatorMessageContent(BaseModel):
+class EvaluationMessage(BaseMessage):
     history: str
     progress: int
 
@@ -175,4 +153,109 @@ class EvaluatorMessageContent(BaseModel):
 class SimulationMessage(Message):
     status: SimulationStatus
     progress: int
-    metrics: List[MetricMessage] = Field(default=[])
+    metrics: Dict[str, Metric] = Field(default={})
+
+
+class InitOrchestrator(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    config: Config
+    agent_ids_by_name: Dict[str, str]
+    monitor_actor: ActorAddress
+
+
+class InitAgent(BaseModel):
+    task: str
+    config: AgentConfig
+    id: str
+
+
+class InitPlanner(InitAgent):
+    workers_info: str
+
+
+class InitMonitor(InitAgent):
+    pass
+
+
+class InitEvaluator(InitAgent):
+    workers_info: str
+    metrics_definitions: List[MetricDefinition]
+    metrics_values: Dict[str, Metric]
+
+
+class InitReporter(InitAgent):
+    workers_info: str
+
+
+class ReportMessage(BaseMessage):
+    from_agent: str = Field(default=ActorName.ORCHESTRATOR)
+    to_agent: str = Field(default=ActorName.REPORTER)
+    history: str = Field(default=None)
+    metrics: Dict[str, Metric] = Field(default={})
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.ORCHESTRATOR
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.REPORTER
+
+
+class StatusUpdateMessage(BaseMessage):
+    from_agent: str = Field(default=ActorName.ORCHESTRATOR)
+    to_agent: str = Field(default=ActorName.MONITOR)
+
+    status: SimulationStatus
+    progress: int
+    summary: Optional[str]
+    metrics: List[Metric]
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.ORCHESTRATOR
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.MONITOR
+
+
+class StatusSnapshotMessage(BaseMessage):
+    from_agent: str = Field(default=ActorName.MONITOR)
+
+    status: SimulationStatus
+    progress: int
+    summary: Optional[str]
+    metrics: List[Metric]
+    last_updated: datetime
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.MONITOR
+
+
+class StatusRequestSignal(SignalMessage):
+    type: Signal = Signal.STATUS
+    to_agent: str = ActorName.MONITOR
+    from_agent: str = ActorName.SERVER
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type(cls, v):
+        return Signal.STATUS
+
+    @field_validator("to_agent", mode="before")
+    @classmethod
+    def set_to_agent(cls, v):
+        return ActorName.MONITOR
+
+    @field_validator("from_agent", mode="before")
+    @classmethod
+    def set_from_agent(cls, v):
+        return ActorName.SERVER

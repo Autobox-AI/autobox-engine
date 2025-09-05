@@ -2,14 +2,15 @@ from typing import Any
 
 from thespian.actors import ActorSystem
 
+from autobox.core.agents.monitor import Monitor
 from autobox.core.agents.orchestrator import Orchestrator
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.actor import Actor, ActorName
+from autobox.schemas.actor import ActorName
 from autobox.schemas.message import (
     InstructionMessage,
     Signal,
     SignalMessage,
-    SimulationSignal,
+    StatusRequestSignal,
 )
 
 STATUS_CHECK_TIMEOUT_SECONDS = 15
@@ -18,50 +19,34 @@ STATUS_CHECK_TIMEOUT_SECONDS = 15
 class ActorManager:
     def __init__(self, agent_ids_by_name: dict):
         self.system = ActorSystem("multiprocQueueBase")
-        self.orchestrator_actor = Actor(
-            address=self.system.createActor(Orchestrator),
-            name=ActorName.ORCHESTRATOR,
-            id=agent_ids_by_name["orchestrator"],
+        self.orchestrator_actor = self.system.createActor(
+            Orchestrator, globalName="orchestrator"
         )
+        self.monitor_actor = self.system.createActor(Monitor, globalName="monitor")
         self.logger = LoggerManager.get_server_logger()
         self._is_alive = True
         self.simulation_id = None
 
-    def is_actor_alive(self) -> bool:
-        """Check if the orchestrator actor is still alive by sending a lightweight probe."""
-        if not self._is_alive:
-            return False
+    def ask_monitor_status(self) -> Any:
+        """Query the Monitor actor for status (fast, non-blocking).
 
+        Returns:
+            Status snapshot from Monitor or None if not available
+        """
         try:
             response = self.system.ask(
-                self.orchestrator_actor.address,
-                SimulationSignal(),
-                timeout=STATUS_CHECK_TIMEOUT_SECONDS,
-            )
-            return response is not None
-        except Exception as e:
-            self.logger.debug(f"Actor probe failed: {e}")
-            self._is_alive = False
-            return False
-
-    def ask_simulation(self, message: SimulationSignal):
-        if not self._is_alive:
-            raise RuntimeError("Actor system is no longer alive")
-
-        try:
-            response = self.system.ask(
-                self.orchestrator_actor.address,
-                message,
-                timeout=STATUS_CHECK_TIMEOUT_SECONDS,
+                self.monitor_actor,
+                StatusRequestSignal(),
+                timeout=5,
             )
             return response
-        except Exception:
-            self._is_alive = False
-            raise
+        except Exception as e:
+            self.logger.error(f"Failed to query Monitor: {e}", exc_info=True)
+            return None
 
-    def ask(self, message: Any) -> Any:
+    def ask_orchestrator(self, message: Any) -> Any:
         return self.system.ask(
-            self.orchestrator_actor.address,
+            self.orchestrator_actor,
             message,
             timeout=STATUS_CHECK_TIMEOUT_SECONDS,
         )
@@ -82,18 +67,15 @@ class ActorManager:
         )
 
         try:
-            self.system.tell(self.orchestrator_actor.address, abort_signal)
-            self.logger.info("Abort signal sent to orchestrator (non-blocking)")
+            self.system.tell(self.orchestrator_actor, abort_signal)
         except Exception as e:
             self.logger.error(f"Failed to send abort signal: {e}")
             raise
 
     def instruct(self, agent_name: str, instruction: Any):
-        self.logger.info(
-            f"ActorManager.instruct called for agent '{agent_name}' with instruction: {instruction}"
-        )
+        self.logger.info(f"Instruction for agent '{agent_name}': {instruction}")
         self.system.tell(
-            self.orchestrator_actor.address,
+            self.orchestrator_actor,
             InstructionMessage(
                 content=instruction,
                 agent_name=agent_name,

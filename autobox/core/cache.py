@@ -12,8 +12,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 from autobox.actor.manager import ActorManager
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.message import SimulationSignal
+from autobox.schemas.cache import StatusCache
+from autobox.schemas.message import StatusSnapshotMessage
 from autobox.schemas.simulation import SimulationStatus
+from autobox.schemas.status import StatusSnapshot
 
 
 class StatusEvent(Enum):
@@ -25,7 +27,7 @@ class StatusEvent(Enum):
     TERMINAL_REACHED = "terminal_reached"
 
 
-class StatusManager:
+class CacheManager:
     """Centralized status management for both Simulator and API.
 
     Provides a single polling loop that monitors the orchestrator and maintains
@@ -49,15 +51,15 @@ class StatusManager:
         self.actor_manager = actor_manager
         self.logger = LoggerManager.get_app_logger()
 
-        self.cache: Dict[str, Any] = {
-            "status": None,
-            "progress": 0,
-            "summary": None,
-            "last_updated": None,
-            "error": None,
-            "consecutive_errors": 0,
-            "metrics": [],
-        }
+        self.cache: StatusCache = StatusCache(
+            status=SimulationStatus.NEW,
+            progress=0,
+            summary=None,
+            last_updated=datetime.now(),
+            error=None,
+            consecutive_errors=0,
+            metrics=[],
+        )
 
         self._subscribers: Dict[StatusEvent, List[Callable]] = {
             event: [] for event in StatusEvent
@@ -111,44 +113,32 @@ class StatusManager:
         """
         while self._running:
             try:
-                response = await self._fetch_status()
+                status_snapshot: Optional[StatusSnapshot] = await self._fetch_status()
 
-                if response:
-                    if self.backoff_multiplier > 1.0:
-                        self.logger.info(
-                            f"Orchestrator responsive again, resetting backoff "
-                            f"(was {self.backoff_multiplier:.1f}x)"
-                        )
+                if status_snapshot:
                     self.backoff_multiplier = 1.0
 
-                    await self._update_cache(response)
+                    await self._update_cache(status_snapshot)
 
-                    if response.status in self.TERMINAL_STATUSES:
+                    if status_snapshot.status in self.TERMINAL_STATUSES:
                         await self._notify_subscribers(
-                            StatusEvent.TERMINAL_REACHED, response
+                            StatusEvent.TERMINAL_REACHED, status_snapshot
                         )
                         self.logger.info(
-                            f"Terminal status reached: {response.status.value}"
+                            f"Terminal status reached: {status_snapshot.status.value}"
                         )
                         break
 
             except Exception as e:
                 await self._handle_error(e)
-
-                old_multiplier = self.backoff_multiplier
                 self.backoff_multiplier = min(
                     self.backoff_multiplier * 1.5, self.max_backoff_multiplier
                 )
-                if old_multiplier != self.backoff_multiplier:
-                    self.logger.info(
-                        f"Increasing backoff to {self.backoff_multiplier:.1f}x "
-                        f"(next check in {interval * self.backoff_multiplier:.1f}s)"
-                    )
 
             sleep_time = interval * self.backoff_multiplier
             await asyncio.sleep(sleep_time)
 
-    async def _fetch_status(self) -> Optional[Any]:
+    async def _fetch_status(self) -> Optional[StatusSnapshot]:
         """Fetch status from orchestrator without blocking.
 
         Uses run_in_executor to prevent blocking the event loop.
@@ -157,68 +147,83 @@ class StatusManager:
         loop = asyncio.get_event_loop()
 
         try:
-            response = await loop.run_in_executor(
-                None, lambda: self.actor_manager.ask_simulation(SimulationSignal())
+            response: Optional[StatusSnapshotMessage] = await loop.run_in_executor(
+                None, lambda: self.actor_manager.ask_monitor_status()
             )
 
             if response is None:
-                current_status = self.cache.get("status")
+                current_status = self.cache.status
                 if current_status in self.TERMINAL_STATUSES:
                     return None
-                raise RuntimeError("Received None response from orchestrator")
+                raise RuntimeError("Received None as status snapshot")
 
-            self.cache["consecutive_errors"] = 0
+            self.cache = self.cache.model_copy(update={"consecutive_errors": 0})
 
-            if self.backoff_multiplier > 1.0:
-                self.logger.debug("Status fetch successful, backoff will reset")
-
-            return response
+            return StatusSnapshot(
+                status=response.status,
+                progress=response.progress,
+                summary=response.summary,
+                metrics=response.metrics,
+                last_updated=response.last_updated.isoformat()
+                if isinstance(response.last_updated, datetime)
+                else response.last_updated,
+            )
 
         except Exception as e:
-            current_status = self.cache.get("status")
+            current_status = self.cache.status
             if current_status not in self.TERMINAL_STATUSES:
+                import traceback
+
                 self.logger.warning(f"Failed to fetch status: {e}")
+                self.logger.warning(f"Traceback: {traceback.format_exc()}")
 
             if (
                 "Actor" in str(e)
                 or "timeout" in str(e).lower()
                 or "None response" in str(e)
             ):
-                self.cache["status"] = SimulationStatus.STOPPED
-                self.cache["error"] = "Actor system not responding"
+                self.cache = self.cache.model_copy(
+                    update={
+                        "status": SimulationStatus.STOPPED,
+                        "error": "Actor system not responding",
+                    }
+                )
 
-            self.cache["consecutive_errors"] += 1
+            self.cache = self.cache.model_copy(
+                update={"consecutive_errors": self.cache.consecutive_errors + 1}
+            )
             raise e
 
-    async def _update_cache(self, response: Any) -> None:
+    async def _update_cache(self, status_snapshot: StatusSnapshot) -> None:
         """Update the cache with new status data.
 
         Args:
-            response: SimulationMessage response from orchestrator
+            response: Dict response from Monitor
         """
-        old_status = self.cache.get("status")
-        old_progress = self.cache.get("progress", 0)
+        old_status = self.cache.status
+        old_progress = self.cache.progress
 
-        self.cache.update(
-            {
-                "status": response.status,
-                "progress": response.progress,
-                "summary": response.summary,
-                "last_updated": datetime.now().isoformat(),
+        new_status = status_snapshot.status
+        new_progress = status_snapshot.progress
+
+        self.cache = self.cache.model_copy(
+            update={
+                "status": new_status,
+                "progress": new_progress,
+                "summary": status_snapshot.summary,
+                "last_updated": status_snapshot.last_updated,
                 "error": None,
-                "metrics": response.metrics,
+                "metrics": status_snapshot.metrics,
             }
         )
 
-        if old_status != response.status:
-            await self._notify_subscribers(StatusEvent.STATUS_CHANGED, response)
-            self.logger.info(
-                f"Status changed: {old_status.value if old_status else 'None'} "
-                f"-> {response.status.value}"
-            )
+        if old_status != new_status:
+            await self._notify_subscribers(StatusEvent.STATUS_CHANGED, status_snapshot)
 
-        if old_progress != response.progress:
-            await self._notify_subscribers(StatusEvent.PROGRESS_UPDATED, response)
+        if old_progress != new_progress:
+            await self._notify_subscribers(
+                StatusEvent.PROGRESS_UPDATED, status_snapshot
+            )
 
     async def _handle_error(self, error: Exception) -> None:
         """Handle errors during status fetching.
@@ -226,13 +231,13 @@ class StatusManager:
         Args:
             error: The exception that occurred
         """
-        current_status = self.cache.get("status")
+        current_status = self.cache.status
         if current_status not in self.TERMINAL_STATUSES:
             self.logger.error(f"Error fetching status: {error}")
-            self.cache["error"] = str(error)
+            self.cache = self.cache.model_copy(update={"error": str(error)})
             await self._notify_subscribers(StatusEvent.ERROR_OCCURRED, error)
 
-        if self.cache["consecutive_errors"] >= 10:
+        if self.cache.consecutive_errors >= 10:
             if current_status not in self.TERMINAL_STATUSES:
                 self.logger.error("Too many consecutive errors, stopping monitoring")
             self._running = False
@@ -279,31 +284,23 @@ class StatusManager:
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            status = self.cache.get("status")
+            status = self.cache.status
 
             if status in self.TERMINAL_STATUSES:
                 return status
 
-            if not self._running and self.cache.get("consecutive_errors", 0) >= 10:
-                self.cache["status"] = SimulationStatus.STOPPED
+            if not self._running and self.cache.consecutive_errors >= 10:
+                self.cache.status = SimulationStatus.STOPPED
                 return SimulationStatus.STOPPED
 
             await asyncio.sleep(0.1)
 
         raise TimeoutError(f"Simulation timeout after {timeout}s")
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> StatusCache:
         """Get current status from cache (non-blocking).
 
         Returns:
             Current status data
         """
-        return self.cache.copy()
-
-    def is_terminal(self) -> bool:
-        """Check if current status is terminal.
-
-        Returns:
-            True if in terminal state
-        """
-        return self.cache.get("status") in self.TERMINAL_STATUSES
+        return self.cache
