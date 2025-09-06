@@ -1,10 +1,10 @@
 import json
 
-from thespian.actors import ActorAddress
+from thespian.actors import ActorAddress, ActorExitRequest
 
 from autobox.core.agents.base import BaseAgent
 from autobox.core.prompts.planner import prompt as system_prompt
-from autobox.schemas.actor import ActorName
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     InitPlanner,
     InstructionMessage,
@@ -20,6 +20,10 @@ class Planner(BaseAgent):
         super().__init__(name=ActorName.PLANNER.value)
 
     def receiveMessage(self, message, sender):
+        if self.status == ActorStatus.STOPPED and not isinstance(message, ActorExitRequest):
+            self.logger.debug(f"Planner is stopped, skipping message: {type(message).__name__}")
+            return
+            
         if isinstance(message, InitPlanner):
             self._initialize_agent(
                 message,
@@ -38,6 +42,8 @@ class Planner(BaseAgent):
         elif isinstance(message, Message):
             self.memory.add_message(message)
             self.plan(sender, message.content)
+        elif isinstance(message, ActorExitRequest):
+            pass
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)

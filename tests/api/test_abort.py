@@ -18,28 +18,28 @@ class TestAbortFunctionality:
 
         response = client.post("/abort")
         assert response.status_code == 202
-        # Endpoint now returns 202 with no body even when no actor manager
 
     def test_abort_endpoint_with_actor_manager(self):
         """Test abort endpoint with a mock status manager."""
         mock_actor_manager = MagicMock()
-        # abort_simulation now returns None (uses tell instead of ask)
         mock_actor_manager.abort_simulation.return_value = None
 
         mock_cache_manager = MagicMock()
         mock_cache_manager.actor_manager = mock_actor_manager
+        mock_cache_manager.get_status.return_value = {
+            "status": "running",
+            "message": "",
+        }
 
         app = create_app(mock_cache_manager)
         client = TestClient(app)
 
         response = client.post("/abort")
         assert response.status_code == 202
-        # No body returned for 202 response
         assert response.content == b""
 
         mock_actor_manager.abort_simulation.assert_called_once()
 
-        # Cache now shows "aborting" status instead of "aborted"
         assert app.state.simulation_cache["status"] == "aborting"
         assert "Abort requested" in app.state.simulation_cache["message"]
 
@@ -57,9 +57,7 @@ class TestAbortFunctionality:
         client = TestClient(app)
 
         response = client.post("/abort")
-        # Still returns 202 even on error to maintain async contract
         assert response.status_code == 202
-        # No body returned for 202 response
         assert response.content == b""
 
     def test_orchestrator_abort_signal_handling(self):
@@ -70,13 +68,16 @@ class TestAbortFunctionality:
         orchestrator = Orchestrator()
         orchestrator.name = "orchestrator"
         orchestrator.addresses = {
+            "monitor": "mock_monitor",
             "worker1": "mock_actor1",
             "worker2": "mock_actor2",
             "planner": "mock_planner",
             "evaluator": "mock_evaluator",
             "reporter": "mock_reporter",
         }
+        orchestrator.monitor = orchestrator.addresses["monitor"]
         orchestrator.logger = MagicMock()
+        orchestrator.wakeupAfter = MagicMock()  # Mock the wakeupAfter method
 
         mock_address = MagicMock()
         with patch.object(
@@ -90,5 +91,7 @@ class TestAbortFunctionality:
             sender = "test_sender"
             orchestrator._handle_abort_signal(sender)
 
-            assert orchestrator.status == ActorStatus.ABORTED
-            assert orchestrator.simulation_status == SimulationStatus.ABORTED
+            assert orchestrator.status == ActorStatus.STOPPED
+            assert orchestrator.simulation_status == SimulationStatus.STOPPING
+            assert orchestrator.simulation_summary == "Simulation aborted by user"
+            assert orchestrator.shutdown_in_progress is True

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from thespian.actors import Actor, ActorAddress
+from thespian.actors import Actor, ActorAddress, ActorExitRequest
 
 from autobox.logging.logger import LoggerManager
 from autobox.schemas.actor import ActorName
@@ -15,8 +15,6 @@ from autobox.schemas.message import (
     StatusUpdateMessage,
 )
 from autobox.schemas.simulation import SimulationStatus
-from autobox.schemas.status import StatusSnapshot
-from autobox.transformation.status import status_uptate_to_snapshot
 
 logger = LoggerManager.get_runner_logger()
 
@@ -28,13 +26,15 @@ class Monitor(Actor):
     """
 
     def __init__(self):
-        super().__init__()
-        self.status_snapshot = StatusSnapshot(
+        """Initialize with a default status snapshot."""
+
+        self.logger = LoggerManager.get_logger("runner")
+        self.status_snapshot = StatusSnapshotMessage(
             status=SimulationStatus.NEW,
             progress=0,
-            summary=None,
+            summary="Initializing",
             metrics=[],
-            last_updated=datetime.now().isoformat(),
+            last_updated=datetime.now(),
         )
 
     def receiveMessage(self, message, sender):
@@ -47,29 +47,62 @@ class Monitor(Actor):
             elif isinstance(message, SignalMessage):
                 self._handle_signal(message, sender)
             elif isinstance(message, StatusUpdateMessage):
-                self._handle_status_update(message)
+                self._handle_status_update(message, sender)
+            elif isinstance(message, ActorExitRequest):
+                self.logger.info("Monitor received ActorExitRequest - terminating")
+                pass
             else:
                 logger.warning(
                     f"Monitor received unknown message type: {type(message)}"
                 )
 
         except Exception as e:
-            logger.error(f"Monitor error handling message: {e}")
+            self.logger.error(f"Monitor error handling message: {e}")
+            import traceback
+
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+
+            # Still try to respond to status requests even on error
             if isinstance(message, StatusRequestSignal):
-                error_status = self.status_snapshot.model_dump()
-                error_status["error"] = str(e)
-                self.send(sender, error_status)
+                self.send(sender, self.status_snapshot)
 
-    def _handle_signal(self, message: SignalMessage, sender):
-        """Process control signals."""
-        if message.type == Signal.STOP:
-            logger.info("Monitor stopping")
+    def _handle_signal(self, message: SignalMessage, sender: ActorAddress):
+        """Handle control signals."""
+        if message.type == Signal.INIT:
             self._ack(sender)
+        elif message.type == Signal.STOP:
+            if message.to_agent == "monitor" or message.to_agent == ActorName.MONITOR:
+                self.logger.info(
+                    "Monitor received STOP signal - shutting down gracefully"
+                )
+                self._ack(sender)
+                self.send(self.myAddress, ActorExitRequest())
+            else:
+                self.logger.debug(
+                    f"Monitor ignoring STOP signal for {message.to_agent}"
+                )
 
-    def _handle_status_update(self, message: StatusUpdateMessage):
-        """Update status snapshot from orchestrator."""
-        logger.info(f"Status updated: {message.status.value} ({message.progress}%)")
-        self.status_snapshot = status_uptate_to_snapshot(message)
+    def _handle_status_update(self, message: StatusUpdateMessage, sender: ActorAddress):
+        """Store the latest status snapshot from Orchestrator."""
+        try:
+            from datetime import datetime
+
+            # Create a proper StatusSnapshotMessage with current timestamp
+            self.status_snapshot = StatusSnapshotMessage(
+                status=message.status,
+                progress=message.progress,
+                summary=message.summary,
+                metrics=message.metrics,
+                last_updated=datetime.now(),
+            )
+            self.logger.debug(
+                f"Monitor updated status: {message.status.value}, progress: {message.progress}"
+            )
+        except Exception as e:
+            self.logger.error(f"Monitor failed to update status: {e}")
+            import traceback
+
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
 
     def _handle_status_request(
         self, message: StatusRequestSignal, sender: ActorAddress

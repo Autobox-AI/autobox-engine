@@ -1,11 +1,11 @@
 import json
 from typing import Dict, List
 
-from thespian.actors import ActorAddress
+from thespian.actors import ActorAddress, ActorExitRequest
 
 from autobox.core.agents.base import BaseAgent
 from autobox.core.prompts.evaluator import prompt as system_prompt
-from autobox.schemas.actor import ActorName
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     EvaluationMessage,
     InitEvaluator,
@@ -27,6 +27,10 @@ class Evaluator(BaseAgent):
         self.metrics_definitions: List[MetricDefinition] = []
 
     def receiveMessage(self, message, sender):
+        if self.status == ActorStatus.STOPPED and not isinstance(message, ActorExitRequest):
+            self.logger.debug(f"Evaluator is stopped, skipping message: {type(message).__name__}")
+            return
+            
         self.memory.add_message(message)
 
         if isinstance(message, InitEvaluator):
@@ -53,8 +57,15 @@ class Evaluator(BaseAgent):
             if message.type == Signal.STOP:
                 self._handle_stop_signal()
         elif isinstance(message, EvaluationMessage):
+            if self.status == ActorStatus.STOPPED:
+                self.logger.info(
+                    "Evaluator ignoring evaluation request - already stopped"
+                )
+                return
             self.memory.add_message(message)
             self._evaluate(sender, message)
+        elif isinstance(message, ActorExitRequest):
+            pass
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)

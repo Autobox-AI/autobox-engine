@@ -1,5 +1,7 @@
 import os
 
+from thespian.actors import ActorExitRequest
+
 from autobox.core.agents.base import BaseAgent
 from autobox.core.ai.llm import LLM
 from autobox.core.prompts.worker import prompt as system_prompt
@@ -21,6 +23,10 @@ class Worker(BaseAgent):
         self.role: str = None
 
     def receiveMessage(self, message, sender):
+        if self.status == ActorStatus.STOPPED and not isinstance(message, ActorExitRequest):
+            self.logger.debug(f"{self.name.upper()} is stopped, skipping message: {type(message).__name__}")
+            return
+            
         if isinstance(message, InitAgent):
             self._initialize_worker(message, sender)
         elif isinstance(message, SignalMessage):
@@ -30,6 +36,8 @@ class Worker(BaseAgent):
             self._handle_instruction(message)
         elif isinstance(message, Message):
             self._process_message(message, sender)
+        elif isinstance(message, ActorExitRequest):
+            pass
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
@@ -53,7 +61,7 @@ class Worker(BaseAgent):
         )
         self.status = ActorStatus.INITIALIZED
         self._send_ack(sender)
-        self.logger.info(f"worker {self.name} initialized (pid: {os.getpid()})")
+        self.logger.info(f"{self.name.upper()} initialized (pid: {os.getpid()})")
 
     def _process_message(self, message, sender):
         """Process incoming message and generate response."""

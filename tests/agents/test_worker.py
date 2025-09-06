@@ -1,6 +1,6 @@
 """Test suite for the Worker agent."""
 
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -96,7 +96,7 @@ class TestWorkerMessageHandling:
 
         worker.receiveMessage(stop_msg, sender)
 
-        worker.send.assert_called_once_with(worker.myAddress, ANY)
+        worker.send.assert_not_called()
         assert worker.status == ActorStatus.STOPPED
 
     @patch("autobox.core.agents.worker.LLM")

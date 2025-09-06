@@ -1,7 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 
-from thespian.actors import Actor, ActorExitRequest
+from thespian.actors import Actor
 
 from autobox.core.ai.llm import LLM
 from autobox.logging.logger import LoggerManager
@@ -35,13 +35,14 @@ class BaseAgent(Actor, ABC):
         )
         self.status = ActorStatus.INITIALIZED
         self._send_ack(sender)
-        self.logger.info(f"{self.name} initialized (pid: {os.getpid()})")
+        self.logger.info(f"{self.name.upper()} initialized (pid: {os.getpid()})")
 
     def _handle_stop_signal(self):
-        """Common stop signal handling."""
-        self.send(self.myAddress, ActorExitRequest())
+        """Common stop signal handling - mark as stopped but don't exit yet."""
         self.status = ActorStatus.STOPPED
-        self.logger.info(f"{self.name} stopped")
+        self.logger.info(
+            f"{self.name.upper()} received STOP signal and marked as stopped"
+        )
 
     def _handle_instruction(self, message):
         """Common instruction message handling."""
@@ -72,7 +73,7 @@ class BaseAgent(Actor, ABC):
 
     def _log_unknown_message(self, message):
         """Log unknown message."""
-        self.logger.info(f"{self.name} received unknown message: {message}")
+        self.logger.info(f"{self.name.upper()} received unknown message: {message}")
 
     @abstractmethod
     def receiveMessage(self, message, sender):

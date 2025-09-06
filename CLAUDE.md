@@ -119,12 +119,30 @@ Simulator → Orchestrator → Planner (gets plan)
 1. Simulator creates Orchestrator actor
 2. Orchestrator creates child actors (Planner, Workers, Evaluator, Reporter)
 3. All actors acknowledge initialization before simulation starts
-4. Graceful shutdown propagates STOP signals through hierarchy
+4. Graceful shutdown uses two-phase approach (see below)
+
+**Graceful Shutdown (Two-Phase Approach)**:
+The system implements a robust two-phase shutdown to ensure clean termination:
+
+*Phase 1 - Stop Processing (3 second grace period):*
+- Triggered by: simulation completion, timeout, or manual abort
+- Orchestrator sends STOP signals to all worker agents (Planner, Workers, Evaluator, Reporter)
+- Monitor remains active to continue serving status updates
+- All actors mark themselves as STOPPED and skip processing new messages
+- Grace period allows in-flight messages to complete
+
+*Phase 2 - Termination:*
+- After grace period expires (via WakeupMessage)
+- Final status update sent to Monitor
+- Monitor receives STOP signal and terminates
+- All actors receive ActorExitRequest for clean termination
+- Orchestrator terminates itself last
 
 **Timeout Handling**:
 - `timeout_seconds` in SimulationConfig sets overall limit
-- Simulator polls actor status every `POLL_INTERVAL_SECONDS`
-- Automatic abort after `MAX_CONSECUTIVE_ERRORS` failures
+- On timeout, Simulator immediately sends STOP to Orchestrator
+- Graceful shutdown cascade begins without waiting for timeout period
+- No error logs for expected shutdown behavior
 
 **Test Data Organization**:
 - Test fixtures in `tests/fixtures/` (not `examples/`)
@@ -165,6 +183,44 @@ Each logger can output to:
 5. **Testing**: Test configs go in `tests/fixtures/`, not `examples/`
 6. **Actor Communication**: Server communicates with actors via `actor_system.ask()`
 7. **Status Caching**: Background task updates cache, endpoints read from cache
+
+## Code Style Guidelines
+
+### Comments Policy
+**IMPORTANT: DO NOT ADD COMMENTS TO CODE** unless explicitly requested. Follow these rules:
+
+1. **NO obvious comments** - Never add comments that state what the code already clearly expresses:
+   ```python
+   # BAD - Never do this:
+   counter += 1  # Increment counter by 1
+   
+   # GOOD - Code is self-explanatory:
+   counter += 1
+   ```
+
+2. **NO redundant docstrings** - Don't add docstrings that just repeat the function/class name:
+   ```python
+   # BAD - Redundant docstring:
+   def get_user_name(user_id):
+       """Gets the user name."""  # This adds no value
+       
+   # GOOD - Either no docstring for obvious functions, or meaningful documentation:
+   def get_user_name(user_id):
+       # No docstring needed for simple, well-named functions
+   ```
+
+3. **NO placeholder comments** - Don't add TODO/FIXME/NOTE comments unless specifically asked
+
+4. **Exceptions** - Only add comments when:
+   - User explicitly requests comments
+   - Complex algorithm requires explanation (and even then, prefer clear variable names)
+   - Non-obvious workaround for a specific issue needs documentation
+
+5. **Self-documenting code** - Instead of comments:
+   - Use descriptive variable and function names
+   - Extract complex logic into well-named functions
+   - Use type hints for clarity
+   - Keep functions small and focused
 
 ## Docker Development Tips
 

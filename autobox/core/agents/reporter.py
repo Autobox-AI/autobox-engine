@@ -1,8 +1,10 @@
 import json
 
+from thespian.actors import ActorExitRequest
+
 from autobox.core.agents.base import BaseAgent
 from autobox.core.prompts.reporter import prompt as system_prompt
-from autobox.schemas.actor import ActorName
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     InitReporter,
     InstructionMessage,
@@ -18,6 +20,10 @@ class Reporter(BaseAgent):
         super().__init__(name=ActorName.REPORTER.value)
 
     def receiveMessage(self, message, sender):
+        if self.status == ActorStatus.STOPPED and not isinstance(message, ActorExitRequest):
+            self.logger.debug(f"Reporter is stopped, skipping message: {type(message).__name__}")
+            return
+            
         if isinstance(message, InitReporter):
             self._initialize_agent(
                 message,
@@ -33,6 +39,8 @@ class Reporter(BaseAgent):
             self._handle_instruction(message)
         elif isinstance(message, ReportMessage):
             self._generate_report(message, sender)
+        elif isinstance(message, ActorExitRequest):
+            pass
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)

@@ -1,3 +1,5 @@
+import os
+
 from autobox.actor.manager import ActorManager
 from autobox.bootstrap.id import create_ids_by_name
 from autobox.core.cache import CacheManager, StatusEvent
@@ -7,9 +9,9 @@ from autobox.schemas.config import Config
 from autobox.schemas.message import InitOrchestrator, Signal, SignalMessage, Status
 from autobox.schemas.simulation import SimulationStatus
 
-POLL_INTERVAL_SECONDS = 1
+POLL_INTERVAL_SECONDS = float(os.environ.get("POLL_INTERVAL_SECONDS", "1"))
 STATUS_CHECK_TIMEOUT_SECONDS = 5
-MAX_CONSECUTIVE_ERRORS = 3
+MAX_CONSECUTIVE_ERRORS = int(os.environ.get("MAX_CONSECUTIVE_ERRORS", "3"))
 WARNING_STATUSES = [
     ActorStatus.STOPPED,
     ActorStatus.ERROR,
@@ -49,29 +51,37 @@ class Simulator:
             self.logger.warning(
                 f"Simulation timeout after {self.config.simulation.timeout_seconds}s"
             )
+            self.stop_the_world()
         finally:
             await self.cache_manager.stop_monitoring()
 
-        self.stop_the_world()
+        if self.cache_manager.cache.status not in [SimulationStatus.STOPPED, SimulationStatus.STOPPING]:
+            self.stop_the_world()
 
         self.logger.info("Simulation finished")
 
     def _on_status_changed(self, response):
         """Callback for status change events."""
-        # No longer logging here - CacheManager handles status change logging
         pass
 
     def _on_error(self, error):
         """Callback for error events."""
-        self.logger.error(f"Status monitoring error: {error}")
+        current_status = self.cache_manager.cache.status
+        if current_status not in self.cache_manager.TERMINAL_STATUSES and current_status != "stopping":
+            self.logger.error(f"Status monitoring error: {error}")
 
     def stop_the_world(self) -> Status:
-        response: Status = self._ask_orchestrator(Signal.STOP)
-        if response and hasattr(response, "status"):
-            self.logger.info(f"Orchestrator stop response: {response.status.value}")
-        else:
-            self.logger.info("Orchestrator already stopped or aborted")
-        return response
+        """Stop the simulation gracefully."""
+        try:
+            response: Status = self._ask_orchestrator(Signal.STOP)
+            if response and hasattr(response, "status"):
+                self.logger.info(f"Orchestrator stop response: {response.status.value}")
+            else:
+                self.logger.debug("Orchestrator already terminated (expected during graceful shutdown)")
+            return response
+        except Exception as e:
+            self.logger.debug(f"Could not contact orchestrator for shutdown (expected if already terminated): {e}")
+            return None
 
     def init(self):
         self.actor_manager.ask_orchestrator(
@@ -95,7 +105,7 @@ class Simulator:
             )
         )
 
-    # Backward compatibility methods for tests
+
     def status(self) -> Status:
         """Legacy method for tests - gets status directly from orchestrator."""
         return self._ask_orchestrator(Signal.STATUS)

@@ -73,7 +73,7 @@ class ActorManager:
             raise
 
     def instruct(self, agent_name: str, instruction: Any):
-        self.logger.info(f"Instruction for agent '{agent_name}': {instruction}")
+        self.logger.info(f"Instruction for {agent_name.upper()}: {instruction}")
         self.system.tell(
             self.orchestrator_actor,
             InstructionMessage(

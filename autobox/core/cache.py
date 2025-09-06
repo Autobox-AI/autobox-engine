@@ -38,8 +38,9 @@ class CacheManager:
     TERMINAL_STATUSES = {
         SimulationStatus.COMPLETED,
         SimulationStatus.FAILED,
-        SimulationStatus.ABORTED,
         SimulationStatus.STOPPED,
+        SimulationStatus.ABORTED,
+        SimulationStatus.TIMEOUT,
     }
 
     def __init__(self, actor_manager: ActorManager):
@@ -127,9 +128,16 @@ class CacheManager:
                         self.logger.info(
                             f"Terminal status reached: {status_snapshot.status.value}"
                         )
+                        self._running = False
                         break
 
             except Exception as e:
+                current_status = self.cache.status
+                if current_status in self.TERMINAL_STATUSES or current_status == SimulationStatus.STOPPING:
+                    self.logger.debug(f"Expected error during shutdown: {e}")
+                    self._running = False
+                    break
+                
                 await self._handle_error(e)
                 self.backoff_multiplier = min(
                     self.backoff_multiplier * 1.5, self.max_backoff_multiplier
@@ -153,9 +161,26 @@ class CacheManager:
 
             if response is None:
                 current_status = self.cache.status
-                if current_status in self.TERMINAL_STATUSES:
+                if (
+                    current_status in self.TERMINAL_STATUSES
+                    or current_status == SimulationStatus.STOPPING
+                ):
+                    if self._running:
+                        self.logger.info(
+                            f"Monitor not responding during {current_status.value} phase - stopping monitoring"
+                        )
+                        self._running = False
                     return None
-                raise RuntimeError("Received None as status snapshot")
+                    
+                self.logger.debug("Monitor not responding - likely shutting down")
+                self._running = False
+                return None
+
+            if not hasattr(response, "progress"):
+                self.logger.warning(
+                    f"Received unexpected message type: {type(response).__name__}"
+                )
+                return None
 
             self.cache = self.cache.model_copy(update={"consecutive_errors": 0})
 
@@ -171,7 +196,10 @@ class CacheManager:
 
         except Exception as e:
             current_status = self.cache.status
-            if current_status not in self.TERMINAL_STATUSES:
+            if (
+                current_status not in self.TERMINAL_STATUSES
+                and current_status != SimulationStatus.STOPPING
+            ):
                 import traceback
 
                 self.logger.warning(f"Failed to fetch status: {e}")
@@ -182,12 +210,13 @@ class CacheManager:
                 or "timeout" in str(e).lower()
                 or "None response" in str(e)
             ):
-                self.cache = self.cache.model_copy(
-                    update={
-                        "status": SimulationStatus.STOPPED,
-                        "error": "Actor system not responding",
-                    }
-                )
+                if current_status not in self.TERMINAL_STATUSES:
+                    self.cache = self.cache.model_copy(
+                        update={
+                            "status": SimulationStatus.STOPPED,
+                            "error": "Actor system not responding",
+                        }
+                    )
 
             self.cache = self.cache.model_copy(
                 update={"consecutive_errors": self.cache.consecutive_errors + 1}

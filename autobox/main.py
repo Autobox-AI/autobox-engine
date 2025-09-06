@@ -113,7 +113,7 @@ async def main():
 
     try:
         await runner_task
-        runner_logger.info("Simulation completed.")
+        runner_logger.info("Simulation completed")
 
         if config.server.exit_on_completion:
             app_logger.info("✅ Simulation finished. Shutting down server...")
