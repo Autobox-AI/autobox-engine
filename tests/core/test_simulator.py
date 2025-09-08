@@ -136,19 +136,15 @@ class TestSimulator:
         """Test stopping the simulation."""
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
             mock_system = Mock()
-            mock_response = Mock()
-            mock_response.status.value = "stopped"
-            mock_system.ask.return_value = mock_response
             MockActorSystem.return_value = mock_system
-            mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
             simulator = Simulator(mock_config)
+            mock_stop = Mock()
+            simulator.actor_manager.stop_the_world = mock_stop
+
             simulator.stop_the_world()
 
-            mock_system.ask.assert_called()
-            call_args = mock_system.ask.call_args[0]
-            assert isinstance(call_args[1], SignalMessage)
-            assert call_args[1].type == Signal.STOP
+            mock_stop.assert_called_once()
 
     def test_status_check(self, mock_config):
         """Test status checking."""
@@ -224,8 +220,6 @@ class TestSimulator:
 
             simulator = Simulator(mock_config)
 
-            # With MAX_CONSECUTIVE_ERRORS=1 in test environment, 
-            # the first None response should raise an exception
             with pytest.raises(StopSimulationException):
                 simulator.check_status(0, 10.0)
 
@@ -281,15 +275,24 @@ class TestSimulator:
             mock_system.ask.side_effect = mock_ask
 
             simulator = Simulator(mock_config)
+            mock_cache = Mock()
+            mock_cache.start_monitoring = AsyncMock()
+            mock_cache.stop_monitoring = AsyncMock()
+            mock_cache.wait_for_completion = AsyncMock(
+                return_value=SimulationStatus.COMPLETED
+            )
+            mock_cache.subscribe = Mock()
+            simulator.cache_manager = mock_cache
+
             await simulator.run()
 
-            assert mock_system.ask.call_count >= 3  # init, start, stop
+            assert mock_system.ask.call_count >= 2  # init, start
 
     @pytest.mark.asyncio
     @patch("autobox.core.cache.asyncio.sleep", new_callable=AsyncMock)
     async def test_run_with_timeout(self, mock_sleep, mock_config):
         """Test simulation run with timeout."""
-        mock_config.simulation.timeout_seconds = 0.01  # Very short timeout for tests
+        mock_config.simulation.timeout_seconds = 0.01
 
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
             mock_system = Mock()
@@ -312,29 +315,14 @@ class TestSimulator:
     async def test_run_with_error_status(self, mock_sleep, mock_config):
         """Test simulation run that ends with error."""
         with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
-            from autobox.schemas.message import SimulationMessage, SimulationSignal
             from autobox.schemas.simulation import SimulationStatus
 
             mock_system = Mock()
             MockActorSystem.return_value = mock_system
             mock_system.createActor.return_value = Mock(spec=ActorAddress)
 
-            error_count = 0
-
             def mock_ask(address, message, timeout=None):
-                nonlocal error_count
-
-                if isinstance(message, SimulationSignal):
-                    error_count += 1
-                    if error_count <= 3:
-                        return None
-                    else:
-                        return SimulationMessage(
-                            status=SimulationStatus.FAILED,
-                            progress=0,
-                            summary="Test failed",
-                        )
-                elif hasattr(message, "type"):
+                if hasattr(message, "type"):
                     if message.type == Signal.START:
                         return Ack(from_agent="orchestrator", to_agent="simulator")
                     elif message.type == Signal.STOP:
@@ -348,9 +336,18 @@ class TestSimulator:
             mock_system.ask.side_effect = mock_ask
 
             simulator = Simulator(mock_config)
+            mock_cache = Mock()
+            mock_cache.start_monitoring = AsyncMock()
+            mock_cache.stop_monitoring = AsyncMock()
+            mock_cache.wait_for_completion = AsyncMock(
+                return_value=SimulationStatus.FAILED
+            )
+            mock_cache.subscribe = Mock()
+            simulator.cache_manager = mock_cache
+
             await simulator.run()
 
-            assert mock_system.ask.call_count >= 3
+            assert mock_system.ask.call_count >= 2  # init and start
 
     @pytest.mark.asyncio
     async def test_loop_status_until_timeout_with_status_changes(self, mock_config):

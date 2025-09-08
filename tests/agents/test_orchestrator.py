@@ -90,7 +90,7 @@ def mock_config():
 def orchestrator():
     """Create an Orchestrator instance for testing."""
     orch = Orchestrator()
-    orch._in_test_mode = True  # Disable immediate shutdown completion
+    orch._in_test_mode = True
     return orch
 
 
@@ -196,6 +196,11 @@ class TestOrchestratorMessageHandling:
     def test_start_signal(self, orchestrator):
         """Test handling START signal."""
         orchestrator.addresses = {"planner": Mock()}
+        orchestrator.monitor = Mock()
+        orchestrator.simulation_status = None
+        orchestrator.simulation_progress = 0
+        orchestrator.simulation_summary = None
+        orchestrator.metrics_values = {}
         orchestrator.send = Mock()
         sender = Mock()
 
@@ -236,6 +241,7 @@ class TestOrchestratorMessageHandling:
     def test_stop_signal(self, orchestrator):
         """Test handling STOP signal."""
         orchestrator.send = Mock()
+        orchestrator.wakeupAfter = Mock()
         type(orchestrator).myAddress = Mock()
         sender = Mock()
 
@@ -248,6 +254,10 @@ class TestOrchestratorMessageHandling:
             "worker_2": Mock(),
         }
         orchestrator.monitor = orchestrator.addresses["monitor"]
+        orchestrator.simulation_status = SimulationStatus.IN_PROGRESS
+        orchestrator.simulation_progress = 0
+        orchestrator.simulation_summary = None
+        orchestrator.metrics_values = {}
 
         stop_msg = SignalMessage(
             type=Signal.STOP, from_agent="simulator", to_agent=ActorName.ORCHESTRATOR
@@ -255,11 +265,10 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(stop_msg, sender)
 
-        assert orchestrator.status == ActorStatus.STOPPED
+        assert orchestrator.status == ActorStatus.STOPPING
         assert orchestrator.shutdown_in_progress is True
         assert orchestrator.shutdown_sender == sender
 
-        # Should have sent STOP signals to all agents except monitor
         stop_signal_calls = [
             call
             for call in orchestrator.send.call_args_list
@@ -267,17 +276,19 @@ class TestOrchestratorMessageHandling:
             and isinstance(call[0][1], SignalMessage)
             and call[0][1].type == Signal.STOP
         ]
-        # 5 agents (planner, evaluator, reporter, 2 workers) - not monitor
-        assert len(stop_signal_calls) == 5
+        # 6 agents (monitor, planner, evaluator, reporter, 2 workers)
+        assert len(stop_signal_calls) == 6
 
         orchestrator._complete_shutdown()
 
-        status_calls = [
+        from autobox.schemas.message import StatusUpdateMessage
+
+        status_update_calls = [
             call
             for call in orchestrator.send.call_args_list
-            if isinstance(call[0][1], Status)
+            if len(call[0]) >= 2 and isinstance(call[0][1], StatusUpdateMessage)
         ]
-        assert len(status_calls) >= 1
+        assert len(status_update_calls) >= 1
 
     def test_planner_message_with_instructions(self, orchestrator):
         """Test handling message from planner with instructions."""
@@ -285,6 +296,11 @@ class TestOrchestratorMessageHandling:
             "worker_1": Mock(),
             "worker_2": Mock(),
         }
+        orchestrator.monitor = Mock()
+        orchestrator.simulation_status = SimulationStatus.IN_PROGRESS
+        orchestrator.simulation_progress = 0
+        orchestrator.simulation_summary = None
+        orchestrator.metrics_values = {}
         orchestrator.send = Mock()
         sender = Mock()
 
@@ -308,15 +324,23 @@ class TestOrchestratorMessageHandling:
 
         assert len(orchestrator.memory.history) == 1
 
-        assert orchestrator.send.call_count == 2
+        assert orchestrator.send.call_count == 3  # 2 workers + 1 status update
 
-        call1 = orchestrator.send.call_args_list[0]
+        worker_calls = [
+            call
+            for call in orchestrator.send.call_args_list
+            if len(call[0]) >= 2 and isinstance(call[0][1], Message)
+        ]
+
+        assert len(worker_calls) == 2
+
+        call1 = worker_calls[0]
         assert call1[0][0] == orchestrator.addresses["worker_1"]
         msg1 = call1[0][1]
         assert isinstance(msg1, Message)
         assert msg1.content == "Do task 1"
 
-        call2 = orchestrator.send.call_args_list[1]
+        call2 = worker_calls[1]
         assert call2[0][0] == orchestrator.addresses["worker_2"]
         msg2 = call2[0][1]
         assert isinstance(msg2, Message)
@@ -328,6 +352,11 @@ class TestOrchestratorMessageHandling:
     def test_planner_message_completed(self, orchestrator):
         """Test handling planner message with COMPLETED status."""
         orchestrator.addresses = {"reporter": Mock()}
+        orchestrator.monitor = Mock()
+        orchestrator.simulation_status = SimulationStatus.IN_PROGRESS
+        orchestrator.simulation_progress = 0
+        orchestrator.simulation_summary = None
+        orchestrator.metrics_values = {}
         orchestrator.send = Mock()
         orchestrator.memory.add_message(
             Message(from_agent="WORKER_1", to_agent="orchestrator", content="Work done")
@@ -349,16 +378,27 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        orchestrator.send.assert_called_once_with(
-            orchestrator.addresses["reporter"], ANY
-        )
+        assert orchestrator.send.call_count == 2  # reporter + status update
+
+        reporter_calls = [
+            call
+            for call in orchestrator.send.call_args_list
+            if call[0][0] == orchestrator.addresses["reporter"]
+        ]
+        assert len(reporter_calls) == 1
 
         assert "reporter" in orchestrator.memory.pending
 
     def test_reporter_message(self, orchestrator):
         """Test handling message from reporter."""
+        orchestrator.monitor = Mock()
+        orchestrator.simulation_status = SimulationStatus.IN_PROGRESS
+        orchestrator.simulation_progress = 0
+        orchestrator.simulation_summary = None
+        orchestrator.metrics_values = {}
+        orchestrator.addresses = {}
         orchestrator.send = Mock()
-        orchestrator.wakeupAfter = Mock()  # Mock the wakeupAfter method
+        orchestrator.wakeupAfter = Mock()
         sender = Mock()
 
         msg = Message(
@@ -369,9 +409,7 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        # Actor status should be STOPPED after initiating shutdown
-        assert orchestrator.status == ActorStatus.STOPPED
-        # But simulation status should be COMPLETED
+        assert orchestrator.status == ActorStatus.STOPPING
         assert orchestrator.simulation_status == SimulationStatus.COMPLETED
 
         assert len(orchestrator.memory.history) == 1

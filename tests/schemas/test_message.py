@@ -150,7 +150,7 @@ class TestStatus:
             ActorStatus.ABORTED,
             ActorStatus.STOPPED,
             ActorStatus.FAILED,
-            ActorStatus.UNKNOWN,
+            ActorStatus.STOPPING,
         ]
 
         for actor_status in statuses:

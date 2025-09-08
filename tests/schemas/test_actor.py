@@ -37,7 +37,7 @@ class TestActorStatusEnum:
         assert ActorStatus.ABORTED == "aborted"
         assert ActorStatus.STOPPED == "stopped"
         assert ActorStatus.FAILED == "failed"
-        assert ActorStatus.UNKNOWN == "unknown"
+        assert ActorStatus.STOPPING == "stopping"
 
     def test_actor_status_string_comparison(self):
         """Test that ActorStatus can be compared with strings."""
@@ -64,7 +64,7 @@ class TestActorStatusEnum:
             ActorStatus.ABORTED: [ActorStatus.STOPPED],
             ActorStatus.STOPPED: [],
             ActorStatus.FAILED: [],
-            ActorStatus.UNKNOWN: [ActorStatus.ERROR, ActorStatus.STOPPED],
+            ActorStatus.STOPPING: [ActorStatus.STOPPED, ActorStatus.ERROR],
         }
 
         assert len(valid_transitions) == 9

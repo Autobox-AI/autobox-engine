@@ -248,7 +248,7 @@ class Orchestrator(BaseAgent):
         """Handle abort signal - use graceful shutdown."""
         self.logger.info("Received ABORT signal - initiating graceful shutdown")
 
-        self.simulation_status = SimulationStatus.STOPPING
+        self.simulation_status = SimulationStatus.ABORTED
         self.simulation_summary = "Simulation aborted by user"
 
         self._initiate_graceful_shutdown(sender)

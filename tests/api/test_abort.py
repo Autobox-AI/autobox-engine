@@ -76,8 +76,12 @@ class TestAbortFunctionality:
             "reporter": "mock_reporter",
         }
         orchestrator.monitor = orchestrator.addresses["monitor"]
+        orchestrator.simulation_status = SimulationStatus.IN_PROGRESS
+        orchestrator.simulation_progress = 0
+        orchestrator.simulation_summary = None
+        orchestrator.metrics_values = {}
         orchestrator.logger = MagicMock()
-        orchestrator.wakeupAfter = MagicMock()  # Mock the wakeupAfter method
+        orchestrator.wakeupAfter = MagicMock()
 
         mock_address = MagicMock()
         with patch.object(
@@ -91,7 +95,7 @@ class TestAbortFunctionality:
             sender = "test_sender"
             orchestrator._handle_abort_signal(sender)
 
-            assert orchestrator.status == ActorStatus.STOPPED
-            assert orchestrator.simulation_status == SimulationStatus.STOPPING
+            assert orchestrator.status == ActorStatus.STOPPING
+            assert orchestrator.simulation_status == SimulationStatus.ABORTED
             assert orchestrator.simulation_summary == "Simulation aborted by user"
             assert orchestrator.shutdown_in_progress is True
