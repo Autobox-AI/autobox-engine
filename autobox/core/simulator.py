@@ -32,8 +32,6 @@ class Simulator:
 
         self.start()
 
-        self.logger.info("Simulation started")
-
         self.cache_manager.subscribe(
             StatusEvent.STATUS_CHANGED, self._on_status_changed
         )

@@ -157,7 +157,8 @@ class Orchestrator(BaseAgent):
         self.status = ActorStatus.RUNNING
         self.simulation_status = SimulationStatus.IN_PROGRESS
         self._update_status_snapshot()
-        self.logger.info("Orchestrator starting...")
+
+        self.logger.info("Simulation started")
 
         self.send(
             self.addresses[ActorName.PLANNER],
