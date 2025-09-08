@@ -29,6 +29,7 @@ def test_config():
         name="Test Simulation",
         description="Test simulation for unit tests",
         timeout_seconds=10,
+        shutdown_grace_period_seconds=10,
         max_steps=5,
         orchestrator=AgentConfig(
             name="orchestrator",

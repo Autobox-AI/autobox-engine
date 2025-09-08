@@ -2,6 +2,7 @@
     "name": "Crime Detective",
 	"max_steps": 150,
 	"timeout_seconds": 300,
+	"shutdown_grace_period_seconds": 20,
 	"description": "This simulation is about a detective that needs to solve a crime.",
 	"task": "A crime needs to be solved: Detective Graves must solve the murder of a prominent art dealer found dead at a high-society gala, with clues pointing to 3 suspects: a SINGER, a DRIVER and a BANKER.",
     "evaluator": {

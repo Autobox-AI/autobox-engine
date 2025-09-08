@@ -64,6 +64,7 @@ def mock_config():
         name="Test Simulation",
         max_steps=10,
         timeout_seconds=10,
+        shutdown_grace_period_seconds=10,
         description="Test simulation",
         task="Test task",
         orchestrator=orchestrator_config,

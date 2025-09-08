@@ -61,6 +61,7 @@ class SimulationConfig(BaseModel):
     name: str
     max_steps: int
     timeout_seconds: int
+    shutdown_grace_period_seconds: int
     description: str
     task: str
     evaluator: AgentConfig

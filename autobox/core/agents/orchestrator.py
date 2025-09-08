@@ -53,7 +53,7 @@ class Orchestrator(BaseAgent):
         self.metrics_definitions: Dict[str, MetricDefinition] = {}
         self.shutdown_in_progress = False
         self.shutdown_initiated_at = None
-        self.shutdown_grace_period = 10.0
+        self.shutdown_grace_period_seconds = None
         self.shutdown_sender = None
         self.final_status_override = None
 
@@ -216,12 +216,12 @@ class Orchestrator(BaseAgent):
             )
 
         self.logger.info(
-            f"Shutdown phase 1 initiated, grace period: {self.shutdown_grace_period}s"
+            f"Shutdown phase 1 initiated, grace period: {self.shutdown_grace_period_seconds}s"
         )
 
         from datetime import timedelta
 
-        self.wakeupAfter(timedelta(seconds=self.shutdown_grace_period))
+        self.wakeupAfter(timedelta(seconds=self.shutdown_grace_period_seconds))
 
     def _complete_shutdown(self):
         """Phase 2: Complete the shutdown sequence."""
@@ -376,6 +376,9 @@ class Orchestrator(BaseAgent):
         self.simulation_status = SimulationStatus.NEW
         self.monitor = message.monitor_actor
         self.simulator_address = sender
+        self.shutdown_grace_period_seconds = (
+            message.config.simulation.shutdown_grace_period_seconds
+        )
 
         workers_info = json.dumps(
             [

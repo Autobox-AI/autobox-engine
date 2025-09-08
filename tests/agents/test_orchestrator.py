@@ -397,6 +397,7 @@ class TestOrchestratorMessageHandling:
         orchestrator.simulation_summary = None
         orchestrator.metrics_values = {}
         orchestrator.addresses = {}
+        orchestrator.shutdown_grace_period_seconds = 10  # Add this
         orchestrator.send = Mock()
         orchestrator.wakeupAfter = Mock()
         sender = Mock()

@@ -2,6 +2,7 @@
     "name": "Test Simulation",
     "max_steps": 150,
     "timeout_seconds": 300,
+    "shutdown_grace_period_seconds": 20,
     "description": "Test simulation for unit tests",
     "task": "Test task for simulation",
     "evaluator": {
