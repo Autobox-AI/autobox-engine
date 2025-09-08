@@ -43,7 +43,7 @@ from autobox.schemas.simulation import SimulationStatus
 class Orchestrator(BaseAgent):
     def __init__(self):
         super().__init__()
-        self.addresses = {}
+        self.addresses: Dict[ActorName | str, ActorAddress] = {}
         self.is_completed = False
         self.simulation_progress = 0
         self.simulation_summary = None
@@ -53,7 +53,7 @@ class Orchestrator(BaseAgent):
         self.metrics_definitions: Dict[str, MetricDefinition] = {}
         self.shutdown_in_progress = False
         self.shutdown_initiated_at = None
-        self.shutdown_grace_period = 3.0
+        self.shutdown_grace_period = 10.0
         self.shutdown_sender = None
         self.final_status_override = None
 
@@ -100,13 +100,13 @@ class Orchestrator(BaseAgent):
 
     def _evaluate(self):
         """Send message to evaluator."""
-        if "evaluator" not in self.addresses:
+        if ActorName.EVALUATOR not in self.addresses:
             self.logger.warning("Evaluator not found in addresses")
             return
 
         try:
             self.send(
-                self.addresses["evaluator"],
+                self.addresses[ActorName.EVALUATOR],
                 EvaluationMessage(
                     from_agent=self.name,
                     to_agent=ActorName.EVALUATOR,
@@ -119,25 +119,18 @@ class Orchestrator(BaseAgent):
 
     def _update_status_snapshot(self):
         """Push current state to Monitor."""
-        # Check if Monitor exists and we're not in a failed state
-        if not hasattr(self, "monitor") or self.monitor is None:
-            self.logger.warning("Monitor not available for status update")
-            return
-
-        try:
-            self.send(
-                self.monitor,
-                StatusUpdateMessage(
-                    status=self.simulation_status or SimulationStatus.NEW,
-                    progress=self.simulation_progress,
-                    summary=self.simulation_summary,
-                    metrics=list(self.metrics_values.values())
-                    if self.metrics_values
-                    else [],
-                ),
-            )
-        except Exception as e:
-            self.logger.error(f"Failed to update Monitor status: {e}")
+        self.send(
+            self.monitor,
+            StatusUpdateMessage(
+                status=self.simulation_status,
+                orchestrator_status=self.status,
+                progress=self.simulation_progress,
+                summary=self.simulation_summary,
+                metrics=list(self.metrics_values.values())
+                if self.metrics_values
+                else [],
+            ),
+        )
 
     def _handle_metrics_message(self, message: MetricsMessage):
         """Handle metrics message."""
@@ -162,12 +155,12 @@ class Orchestrator(BaseAgent):
     def _handle_start_signal(self, sender):
         """Start the simulation."""
         self.status = ActorStatus.RUNNING
-        self.simulation_status = SimulationStatus.STARTED
+        self.simulation_status = SimulationStatus.IN_PROGRESS
         self._update_status_snapshot()
         self.logger.info("Orchestrator starting...")
 
         self.send(
-            self.addresses["planner"],
+            self.addresses[ActorName.PLANNER],
             SignalMessage(
                 from_agent=self.name,
                 to_agent=ActorName.PLANNER,
@@ -194,36 +187,32 @@ class Orchestrator(BaseAgent):
 
     def _initiate_graceful_shutdown(self, sender=None):
         """Phase 1: Initiate graceful shutdown."""
-        if self.shutdown_in_progress:
-            self.logger.debug(
-                "Shutdown already in progress, skipping duplicate initiation"
-            )
-            return
-
-        self.logger.info("Initiating graceful shutdown...")
-
-        if self.simulation_status != SimulationStatus.COMPLETED:
-            self.simulation_status = SimulationStatus.STOPPING
-
-        self.status = ActorStatus.STOPPED
-
-        self._update_status_snapshot()
-
-        for agent_name, agent_address in self.addresses.items():
-            if agent_name != "monitor":
-                self.logger.info(f"Sending STOP signal to {agent_name}")
-                self.send(
-                    agent_address,
-                    SignalMessage(
-                        from_agent=self.name, to_agent=agent_name, type=Signal.STOP
-                    ),
-                )
-
         import time
 
+        if self.shutdown_in_progress:
+            self.logger.info("Shutdown already in progress")
+            return
+
+        self.status = ActorStatus.STOPPING
         self.shutdown_in_progress = True
         self.shutdown_initiated_at = time.time()
         self.shutdown_sender = sender
+
+        self.logger.info("Initiating graceful shutdown...")
+
+        # if self.simulation_status != SimulationStatus.COMPLETED:
+        #     self.simulation_status = SimulationStatus.TIMEOUT
+
+        # self._update_status_snapshot()
+
+        for agent_name, agent_address in self.addresses.items():
+            self.logger.info(f"Sending STOP signal to {agent_name}")
+            self.send(
+                agent_address,
+                SignalMessage(
+                    from_agent=self.name, to_agent=agent_name, type=Signal.STOP
+                ),
+            )
 
         self.logger.info(
             f"Shutdown phase 1 initiated, grace period: {self.shutdown_grace_period}s"
@@ -235,50 +224,18 @@ class Orchestrator(BaseAgent):
 
     def _complete_shutdown(self):
         """Phase 2: Complete the shutdown sequence."""
-        if not self.shutdown_in_progress:
-            return
-
         self.logger.info("Completing shutdown sequence...")
-
-        if self.final_status_override:
-            self.simulation_status = self.final_status_override
-        elif self.simulation_status != SimulationStatus.STOPPING:
-            pass
-        elif "abort" in (self.simulation_summary or "").lower():
-            self.simulation_status = SimulationStatus.ABORTED
-        else:
-            self.simulation_status = SimulationStatus.STOPPED
-            if not self.simulation_summary:
-                self.simulation_summary = "Simulation stopped"
-
-        self._update_status_snapshot()
 
         import time
 
         time.sleep(0.1)
 
-        if "monitor" in self.addresses:
-            self.logger.info("Sending STOP signal to monitor")
-            self.send(
-                self.addresses["monitor"],
-                SignalMessage(
-                    from_agent=self.name, to_agent="monitor", type=Signal.STOP
-                ),
-            )
-
-        if self.shutdown_sender:
-            self.send(
-                self.shutdown_sender,
-                Status(
-                    from_agent=self.name,
-                    to_agent=ActorName.SIMULATOR,
-                    status=self.status,
-                ),
-            )
+        self.status = ActorStatus.STOPPED
+        self._update_status_snapshot()
 
         for agent_name, agent_address in self.addresses.items():
-            self.logger.info(f"Terminating agent: {agent_name}")
-            self.send(agent_address, ActorExitRequest())
+            if agent_name != ActorName.MONITOR:
+                self.send(agent_address, ActorExitRequest())
 
         self.shutdown_in_progress = False
         self.shutdown_initiated_at = None
@@ -345,11 +302,7 @@ class Orchestrator(BaseAgent):
 
         self._update_status_snapshot()
 
-        self.final_status_override = SimulationStatus.COMPLETED
-
-        self.logger.info(
-            "Simulation completed successfully - initiating graceful shutdown"
-        )
+        self.logger.info("Simulation completed successfully")
 
         self._initiate_graceful_shutdown(sender=None)
 
@@ -395,7 +348,7 @@ class Orchestrator(BaseAgent):
         self.simulation_status = SimulationStatus.SUMMARIZING
         self._update_status_snapshot()
         self.send(
-            self.addresses["reporter"],
+            self.addresses[ActorName.REPORTER],
             ReportMessage(
                 history=self.memory.get_history_between_worker_str(),
                 metrics=self.metrics_values,
@@ -487,10 +440,10 @@ class Orchestrator(BaseAgent):
         }
 
         self.addresses = {
-            "monitor": self.monitor,
-            "planner": self.planner,
-            "evaluator": self.evaluator,
-            "reporter": self.reporter,
+            ActorName.MONITOR: self.monitor,
+            ActorName.PLANNER: self.planner,
+            ActorName.EVALUATOR: self.evaluator,
+            ActorName.REPORTER: self.reporter,
             **worker_actor_addresses_by_name,
         }
         workers_info = json.dumps(

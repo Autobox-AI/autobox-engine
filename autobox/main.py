@@ -92,14 +92,11 @@ async def main():
 
     simulation_id = simulator.agent_ids_by_name.get("orchestrator", "unknown")
     app_logger.info("=" * 60)
-    app_logger.info(f"🚀 SIMULATION: {config.simulation.name}")
-    app_logger.info(f"📝 SIMULATION ID: {simulation_id}")
-    app_logger.info(
-        f"🔍 Check status with: http://localhost:{config.server.port}/status"
-    )
-    app_logger.info(
-        f"📊 Check metrics with: http://localhost:{config.server.port}/metrics"
-    )
+    app_logger.info(f"🚀 Simulation: {config.simulation.name}")
+    app_logger.info(f"📝 Simulation ID: {simulation_id}")
+    app_logger.info(f"⏱️ Timeout: {config.simulation.timeout_seconds} seconds")
+    app_logger.info(f"🔍 Status: http://localhost:{config.server.port}/status")
+    app_logger.info(f"📊 Metrics: http://localhost:{config.server.port}/metrics")
     app_logger.info("=" * 60)
 
     runner = Runner(simulator=simulator)
@@ -113,15 +110,14 @@ async def main():
 
     try:
         await runner_task
-        runner_logger.info("Simulation completed")
 
         if config.server.exit_on_completion:
-            app_logger.info("✅ Simulation finished. Shutting down server...")
+            app_logger.info("Simulation terminated. Shutting down server...")
             shutdown_event.set()
             await server_task
         else:
             app_logger.info(
-                "✅ Simulation finished. Server still running. Press Ctrl+C to stop."
+                "Simulation terminated. Server still running. Press Ctrl+C to stop."
             )
             await server_task
 

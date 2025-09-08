@@ -27,10 +27,12 @@ class Evaluator(BaseAgent):
         self.metrics_definitions: List[MetricDefinition] = []
 
     def receiveMessage(self, message, sender):
-        if self.status == ActorStatus.STOPPED and not isinstance(message, ActorExitRequest):
-            self.logger.debug(f"Evaluator is stopped, skipping message: {type(message).__name__}")
+        if self.status == ActorStatus.STOPPED:
+            self.logger.debug(
+                f"Evaluator is stopped, skipping message: {type(message).__name__}"
+            )
             return
-            
+
         self.memory.add_message(message)
 
         if isinstance(message, InitEvaluator):
@@ -65,7 +67,8 @@ class Evaluator(BaseAgent):
             self.memory.add_message(message)
             self._evaluate(sender, message)
         elif isinstance(message, ActorExitRequest):
-            pass
+            self.logger.info(f"Terminating agent: {self.name}")
+            return ActorExitRequest()
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)

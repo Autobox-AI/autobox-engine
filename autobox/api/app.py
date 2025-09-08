@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     yield
 
-    logger.info("Autobox API server shutdown complete")
+    logger.info("Autobox API server shutdown completed")
 
 
 class AutoboxApp:

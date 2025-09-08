@@ -15,17 +15,13 @@ from autobox.schemas.metrics import (
 
 
 class SimulationStatus(str, Enum):
-    STARTED = "started"
+    NEW = "new"
     IN_PROGRESS = "in progress"
     FAILED = "failed"
     COMPLETED = "completed"
     SUMMARIZING = "summarizing"
     TIMEOUT = "timeout"
     ABORTED = "aborted"
-    STOPPING = "stopping"  # New transitional status for graceful shutdown
-    STOPPED = "stopped"
-    NEW = "new"
-    UNKNOWN = "unknown"
 
 
 class SimulationResponse(BaseModel):

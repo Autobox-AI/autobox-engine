@@ -210,6 +210,7 @@ class StatusUpdateMessage(BaseMessage):
     to_agent: str = Field(default=ActorName.MONITOR)
 
     status: SimulationStatus
+    orchestrator_status: ActorStatus
     progress: int
     summary: Optional[str]
     metrics: List[Metric]
@@ -229,6 +230,7 @@ class StatusSnapshotMessage(BaseMessage):
     from_agent: str = Field(default=ActorName.MONITOR)
 
     status: SimulationStatus
+    orchestrator_status: ActorStatus
     progress: int
     summary: Optional[str]
     metrics: List[Metric]

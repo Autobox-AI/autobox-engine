@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from autobox.actor.manager import ActorManager
 from autobox.logging.logger import LoggerManager
+from autobox.schemas.actor import ActorStatus
 from autobox.schemas.cache import StatusCache
 from autobox.schemas.message import StatusSnapshotMessage
 from autobox.schemas.simulation import SimulationStatus
@@ -36,11 +37,14 @@ class CacheManager:
     """
 
     TERMINAL_STATUSES = {
-        SimulationStatus.COMPLETED,
-        SimulationStatus.FAILED,
-        SimulationStatus.STOPPED,
-        SimulationStatus.ABORTED,
-        SimulationStatus.TIMEOUT,
+        # SimulationStatus.COMPLETED,
+        # SimulationStatus.FAILED,
+        # SimulationStatus.ABORTED,
+        # SimulationStatus.TIMEOUT,
+        ActorStatus.STOPPED,
+        ActorStatus.ERROR,
+        ActorStatus.ABORTED,
+        ActorStatus.FAILED,
     }
 
     def __init__(self, actor_manager: ActorManager):
@@ -54,6 +58,7 @@ class CacheManager:
 
         self.cache: StatusCache = StatusCache(
             status=SimulationStatus.NEW,
+            orchestrator_status=ActorStatus.INITIALIZED,
             progress=0,
             summary=None,
             last_updated=datetime.now(),
@@ -121,23 +126,22 @@ class CacheManager:
 
                     await self._update_cache(status_snapshot)
 
-                    if status_snapshot.status in self.TERMINAL_STATUSES:
+                    if status_snapshot.orchestrator_status in self.TERMINAL_STATUSES:
                         await self._notify_subscribers(
                             StatusEvent.TERMINAL_REACHED, status_snapshot
                         )
                         self.logger.info(
-                            f"Terminal status reached: {status_snapshot.status.value}"
+                            f"Terminal status reached: {status_snapshot.orchestrator_status.value}"
                         )
                         self._running = False
                         break
 
             except Exception as e:
                 current_status = self.cache.status
-                if current_status in self.TERMINAL_STATUSES or current_status == SimulationStatus.STOPPING:
-                    self.logger.debug(f"Expected error during shutdown: {e}")
+                if current_status in self.TERMINAL_STATUSES:
                     self._running = False
                     break
-                
+
                 await self._handle_error(e)
                 self.backoff_multiplier = min(
                     self.backoff_multiplier * 1.5, self.max_backoff_multiplier
@@ -160,32 +164,14 @@ class CacheManager:
             )
 
             if response is None:
-                current_status = self.cache.status
-                if (
-                    current_status in self.TERMINAL_STATUSES
-                    or current_status == SimulationStatus.STOPPING
-                ):
-                    if self._running:
-                        self.logger.info(
-                            f"Monitor not responding during {current_status.value} phase - stopping monitoring"
-                        )
-                        self._running = False
-                    return None
-                    
-                self.logger.debug("Monitor not responding - likely shutting down")
                 self._running = False
-                return None
-
-            if not hasattr(response, "progress"):
-                self.logger.warning(
-                    f"Received unexpected message type: {type(response).__name__}"
-                )
                 return None
 
             self.cache = self.cache.model_copy(update={"consecutive_errors": 0})
 
             return StatusSnapshot(
                 status=response.status,
+                orchestrator_status=response.orchestrator_status,
                 progress=response.progress,
                 summary=response.summary,
                 metrics=response.metrics,
@@ -196,27 +182,19 @@ class CacheManager:
 
         except Exception as e:
             current_status = self.cache.status
-            if (
-                current_status not in self.TERMINAL_STATUSES
-                and current_status != SimulationStatus.STOPPING
-            ):
+            if current_status not in self.TERMINAL_STATUSES:
                 import traceback
 
                 self.logger.warning(f"Failed to fetch status: {e}")
                 self.logger.warning(f"Traceback: {traceback.format_exc()}")
 
-            if (
-                "Actor" in str(e)
-                or "timeout" in str(e).lower()
-                or "None response" in str(e)
-            ):
-                if current_status not in self.TERMINAL_STATUSES:
-                    self.cache = self.cache.model_copy(
-                        update={
-                            "status": SimulationStatus.STOPPED,
-                            "error": "Actor system not responding",
-                        }
-                    )
+            if current_status not in self.TERMINAL_STATUSES:
+                self.cache = self.cache.model_copy(
+                    update={
+                        "orchestrator_status": ActorStatus.ERROR,
+                        "error": "Actor system not responding",
+                    }
+                )
 
             self.cache = self.cache.model_copy(
                 update={"consecutive_errors": self.cache.consecutive_errors + 1}
@@ -238,6 +216,7 @@ class CacheManager:
         self.cache = self.cache.model_copy(
             update={
                 "status": new_status,
+                "orchestrator_status": status_snapshot.orchestrator_status,
                 "progress": new_progress,
                 "summary": status_snapshot.summary,
                 "last_updated": status_snapshot.last_updated,
@@ -313,14 +292,12 @@ class CacheManager:
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            status = self.cache.status
-
-            if status in self.TERMINAL_STATUSES:
-                return status
+            if self.cache.orchestrator_status in self.TERMINAL_STATUSES:
+                return self.cache.status
 
             if not self._running and self.cache.consecutive_errors >= 10:
-                self.cache.status = SimulationStatus.STOPPED
-                return SimulationStatus.STOPPED
+                self.cache.orchestrator_status = ActorStatus.STOPPED
+                return SimulationStatus.FAILED
 
             await asyncio.sleep(0.1)
 

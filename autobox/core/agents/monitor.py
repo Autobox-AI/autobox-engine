@@ -2,10 +2,11 @@
 
 from datetime import datetime
 
-from thespian.actors import Actor, ActorAddress, ActorExitRequest
+from thespian.actors import ActorAddress, ActorExitRequest
 
+from autobox.core.agents.base import BaseAgent
 from autobox.logging.logger import LoggerManager
-from autobox.schemas.actor import ActorName
+from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     InitMonitor,
     Signal,
@@ -19,7 +20,7 @@ from autobox.schemas.simulation import SimulationStatus
 logger = LoggerManager.get_runner_logger()
 
 
-class Monitor(Actor):
+class Monitor(BaseAgent):
     """
     Lightweight actor that maintains simulation status separately from the orchestrator.
     Receives push updates from orchestrator and serves queries from CacheManager.
@@ -31,6 +32,7 @@ class Monitor(Actor):
         self.logger = LoggerManager.get_logger("runner")
         self.status_snapshot = StatusSnapshotMessage(
             status=SimulationStatus.NEW,
+            orchestrator_status=ActorStatus.INITIALIZED,
             progress=0,
             summary="Initializing",
             metrics=[],
@@ -41,6 +43,7 @@ class Monitor(Actor):
         """Handle messages based on type."""
         try:
             if isinstance(message, InitMonitor):
+                self.name = ActorName.MONITOR.value
                 self._ack(sender)
             elif isinstance(message, StatusRequestSignal):
                 self._handle_status_request(message, sender)
@@ -49,8 +52,8 @@ class Monitor(Actor):
             elif isinstance(message, StatusUpdateMessage):
                 self._handle_status_update(message, sender)
             elif isinstance(message, ActorExitRequest):
-                self.logger.info("Monitor received ActorExitRequest - terminating")
-                pass
+                self.logger.info(f"Terminating agent: {self.name}")
+                return ActorExitRequest()
             else:
                 logger.warning(
                     f"Monitor received unknown message type: {type(message)}"
@@ -68,28 +71,17 @@ class Monitor(Actor):
 
     def _handle_signal(self, message: SignalMessage, sender: ActorAddress):
         """Handle control signals."""
-        if message.type == Signal.INIT:
-            self._ack(sender)
-        elif message.type == Signal.STOP:
-            if message.to_agent == "monitor" or message.to_agent == ActorName.MONITOR:
-                self.logger.info(
-                    "Monitor received STOP signal - shutting down gracefully"
-                )
-                self._ack(sender)
-                self.send(self.myAddress, ActorExitRequest())
-            else:
-                self.logger.debug(
-                    f"Monitor ignoring STOP signal for {message.to_agent}"
-                )
+        if message.type == Signal.STOP:
+            self._handle_stop_signal()
 
     def _handle_status_update(self, message: StatusUpdateMessage, sender: ActorAddress):
         """Store the latest status snapshot from Orchestrator."""
         try:
             from datetime import datetime
 
-            # Create a proper StatusSnapshotMessage with current timestamp
             self.status_snapshot = StatusSnapshotMessage(
                 status=message.status,
+                orchestrator_status=message.orchestrator_status,
                 progress=message.progress,
                 summary=message.summary,
                 metrics=message.metrics,
@@ -113,6 +105,7 @@ class Monitor(Actor):
             sender,
             StatusSnapshotMessage(
                 status=self.status_snapshot.status,
+                orchestrator_status=self.status_snapshot.orchestrator_status,
                 progress=self.status_snapshot.progress,
                 summary=self.status_snapshot.summary,
                 metrics=self.status_snapshot.metrics,

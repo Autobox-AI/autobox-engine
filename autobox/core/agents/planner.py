@@ -20,10 +20,12 @@ class Planner(BaseAgent):
         super().__init__(name=ActorName.PLANNER.value)
 
     def receiveMessage(self, message, sender):
-        if self.status == ActorStatus.STOPPED and not isinstance(message, ActorExitRequest):
-            self.logger.debug(f"Planner is stopped, skipping message: {type(message).__name__}")
+        if self.status == ActorStatus.STOPPED:
+            self.logger.debug(
+                f"Planner is stopped, skipping message: {type(message).__name__}"
+            )
             return
-            
+
         if isinstance(message, InitPlanner):
             self._initialize_agent(
                 message,
@@ -43,7 +45,8 @@ class Planner(BaseAgent):
             self.memory.add_message(message)
             self.plan(sender, message.content)
         elif isinstance(message, ActorExitRequest):
-            pass
+            self.logger.info(f"Terminating agent: {self.name}")
+            return ActorExitRequest()
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)

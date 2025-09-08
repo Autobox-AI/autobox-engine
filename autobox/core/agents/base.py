@@ -41,7 +41,7 @@ class BaseAgent(Actor, ABC):
         """Common stop signal handling - mark as stopped but don't exit yet."""
         self.status = ActorStatus.STOPPED
         self.logger.info(
-            f"{self.name.upper()} received STOP signal and marked as stopped"
+            f"{self.name.upper()} received STOP signal - shutting down gracefully"
         )
 
     def _handle_instruction(self, message):

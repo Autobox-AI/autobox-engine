@@ -1,6 +1,6 @@
 from typing import Any
 
-from thespian.actors import ActorSystem
+from thespian.actors import ActorExitRequest, ActorSystem
 
 from autobox.core.agents.monitor import Monitor
 from autobox.core.agents.orchestrator import Orchestrator
@@ -34,12 +34,11 @@ class ActorManager:
             Status snapshot from Monitor or None if not available
         """
         try:
-            response = self.system.ask(
+            return self.system.ask(
                 self.monitor_actor,
                 StatusRequestSignal(),
                 timeout=5,
             )
-            return response
         except Exception as e:
             self.logger.error(f"Failed to query Monitor: {e}", exc_info=True)
             return None
@@ -71,6 +70,13 @@ class ActorManager:
         except Exception as e:
             self.logger.error(f"Failed to send abort signal: {e}")
             raise
+
+    def stop_the_world(self):
+        self.system.tell(self.orchestrator_actor, ActorExitRequest())
+        self.system.tell(self.monitor_actor, ActorExitRequest())
+
+    def stop_monitor(self):
+        self.system.tell(self.monitor_actor, ActorExitRequest())
 
     def instruct(self, agent_name: str, instruction: Any):
         self.logger.info(f"Instruction for {agent_name.upper()}: {instruction}")
