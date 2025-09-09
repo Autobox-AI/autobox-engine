@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import timedelta
 from typing import Dict
 
 from thespian.actors import (
@@ -60,10 +61,37 @@ class Orchestrator(BaseAgent):
     def receiveMessage(self, message, sender):
         """Main message handler - delegates to specific handlers based on message type."""
 
+        if isinstance(message, InitOrchestrator):
+            self.handle_init(sender, message)
+            return
+
+        if isinstance(message, WakeupMessage):
+            if self.shutdown_in_progress:
+                if self.memory.has_pending():
+                    self.logger.info(
+                        f"Still waiting for pending messages ({self.memory.pending_count()}), Shutdown grace period: {self.shutdown_grace_period_seconds}s"
+                    )
+                    self.wakeupAfter(
+                        timedelta(seconds=self.shutdown_grace_period_seconds)
+                    )
+                else:
+                    self._complete_shutdown()
+                return
+        elif isinstance(message, ActorExitRequest) or isinstance(
+            message, ChildActorExited
+        ):
+            return
+
+        self.memory.remove_if_pending(message.from_agent)
+
+        if self.shutdown_in_progress and not isinstance(message, SignalMessage):
+            self.logger.debug(
+                f"Shutdown in progress - skipping message from {message.from_agent}"
+            )
+            return
+
         try:
-            if isinstance(message, InitOrchestrator):
-                self.handle_init(sender, message)
-            elif isinstance(message, MetricsMessage):
+            if isinstance(message, MetricsMessage):
                 self._handle_metrics_message(message)
             elif isinstance(message, SignalMessage):
                 self._handle_signal_message(message, sender)
@@ -71,13 +99,6 @@ class Orchestrator(BaseAgent):
                 self._handle_instruction_message(message)
             elif isinstance(message, Message):
                 self._handle_agent_message(message)
-            elif isinstance(message, WakeupMessage):
-                if self.shutdown_in_progress:
-                    self._complete_shutdown()
-            elif isinstance(message, ActorExitRequest) or isinstance(
-                message, ChildActorExited
-            ):
-                pass
             else:
                 self._log_unknown_message(message)
 
@@ -103,6 +124,8 @@ class Orchestrator(BaseAgent):
         if ActorName.EVALUATOR not in self.addresses:
             self.logger.warning("Evaluator not found in addresses")
             return
+
+        self.memory.add_pending(ActorName.EVALUATOR)
 
         try:
             self.send(
@@ -160,6 +183,8 @@ class Orchestrator(BaseAgent):
 
         self.logger.info("Simulation started")
 
+        self.memory.add_pending(ActorName.PLANNER)
+
         self.send(
             self.addresses[ActorName.PLANNER],
             SignalMessage(
@@ -183,7 +208,9 @@ class Orchestrator(BaseAgent):
 
     def _handle_stop_signal(self, sender):
         """Handle STOP signal from simulator."""
-        self.logger.info("Received STOP signal - initiating graceful shutdown")
+        self.logger.info(
+            f"{self.name.upper()} received STOP signal - initiating graceful shutdown"
+        )
         self._initiate_graceful_shutdown(sender)
 
     def _initiate_graceful_shutdown(self, sender=None):
@@ -219,8 +246,6 @@ class Orchestrator(BaseAgent):
             f"Shutdown phase 1 initiated, grace period: {self.shutdown_grace_period_seconds}s"
         )
 
-        from datetime import timedelta
-
         self.wakeupAfter(timedelta(seconds=self.shutdown_grace_period_seconds))
 
     def _complete_shutdown(self):
@@ -240,6 +265,17 @@ class Orchestrator(BaseAgent):
 
         self.shutdown_in_progress = False
         self.shutdown_initiated_at = None
+
+        if self.shutdown_sender:
+            self.send(
+                self.shutdown_sender,
+                Status(
+                    from_agent=self.name,
+                    to_agent=ActorName.SIMULATOR,
+                    status=ActorStatus.STOPPED,
+                ),
+            )
+
         self.shutdown_sender = None
 
         self.logger.info("Orchestrator terminating")
@@ -274,8 +310,14 @@ class Orchestrator(BaseAgent):
     def _handle_agent_message(self, message):
         """Process messages from agents."""
 
-        if self.status == ActorStatus.ABORTED:
-            self.logger.info("Orchestrator aborted - skipping message")
+        if self.status in [
+            ActorStatus.ABORTED,
+            ActorStatus.STOPPING,
+            ActorStatus.STOPPED,
+        ]:
+            self.logger.info(
+                f"Orchestrator status is {self.status} - skipping message from {message.from_agent}"
+            )
             return
 
         self.memory.add_message(message)
@@ -283,8 +325,6 @@ class Orchestrator(BaseAgent):
         if message.from_agent == ActorName.REPORTER:
             self._handle_reporter_completion(message)
             return
-
-        self.memory.remove_if_pending(message.from_agent)
 
         if message.from_agent == ActorName.PLANNER:
             self._handle_planner_message(message)
@@ -335,6 +375,7 @@ class Orchestrator(BaseAgent):
         if self.memory.has_pending():
             return
 
+        self.memory.add_pending(ActorName.PLANNER)
         self.send(
             self.addresses["planner"],
             Message(
@@ -348,6 +389,7 @@ class Orchestrator(BaseAgent):
         """Start the reporting phase."""
         self.simulation_status = SimulationStatus.SUMMARIZING
         self._update_status_snapshot()
+        self.memory.add_pending("reporter")
         self.send(
             self.addresses[ActorName.REPORTER],
             ReportMessage(
@@ -355,11 +397,11 @@ class Orchestrator(BaseAgent):
                 metrics=self.metrics_values,
             ),
         )
-        self.memory.add_pending("reporter")
 
     def _dispach_instructions(self, instructions):
         """Send instructions to respective agents."""
         for instruction in instructions:
+            self.memory.add_pending(instruction.agent_name)
             self.send(
                 self.addresses[instruction.agent_name],
                 Message(
@@ -368,7 +410,6 @@ class Orchestrator(BaseAgent):
                     content=instruction.instruction,
                 ),
             )
-            self.memory.add_pending(instruction.agent_name)
 
     def handle_init(self, sender: ActorAddress, message: InitOrchestrator):
         self.id = message.agent_ids_by_name["orchestrator"]

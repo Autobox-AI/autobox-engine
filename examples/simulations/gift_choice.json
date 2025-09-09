@@ -2,7 +2,7 @@
     "name": "Gift choice",
     "max_steps": 150,
     "timeout_seconds": 120,
-    "shutdown_grace_period_seconds": 20,
+    "shutdown_grace_period_seconds": 5,
     "description": "This simulation is about two friends that need to decide together a gift for a special occasion.",
     "task": "The task is VERY simple and should be completed in seconds: Ana and John need to pick a gift for the 30th birthday of another friend called Maria who likes books and reading, mainly fantasy books. She has preferences for Tokien and one book she has never read is 'The Hobbit'. Maria will be happy with any gift, but she will be happier with whatever gift. Ana and John should pick between 'The Hobbit: Illustrated Deluxe Edition, HarperCollins, Alan Lee' and 'The Hobbit, or There and Back Again, J.R.R. Tolkien'. Budget, delivery time, availability and NOTHING else matters, they ONLY need to pick one of the two options. There must not be other discussion, they should pick and that's it.",
     "evaluator": {

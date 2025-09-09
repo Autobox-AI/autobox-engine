@@ -1,5 +1,7 @@
 """Test suite for the Orchestrator agent."""
 
+from collections import deque
+from datetime import datetime
 from unittest.mock import ANY, Mock, patch
 
 import pytest
@@ -419,7 +421,7 @@ class TestOrchestratorMessageHandling:
         """Test that worker message triggers planner when no pending agents."""
         orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
-        orchestrator.memory.pending = []
+        orchestrator.memory.pending = {}
         sender = Mock()
 
         msg = Message(
@@ -440,7 +442,8 @@ class TestOrchestratorMessageHandling:
         """Test that worker message doesn't trigger planner when agents are pending."""
         orchestrator.addresses = {"planner": Mock()}
         orchestrator.send = Mock()
-        orchestrator.memory.pending = ["WORKER_2"]
+        from collections import deque
+        orchestrator.memory.pending = {"WORKER_2": deque([datetime.now()])}
         sender = Mock()
 
         msg = Message(

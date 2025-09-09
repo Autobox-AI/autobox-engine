@@ -72,8 +72,15 @@ class ActorManager:
             raise
 
     def stop_the_world(self):
-        self.system.tell(self.orchestrator_actor, ActorExitRequest())
-        self.system.tell(self.monitor_actor, ActorExitRequest())
+        self.stop_monitor()
+        self.system.ask(
+            self.orchestrator_actor,
+            SignalMessage(
+                type=Signal.STOP,
+                from_agent=ActorName.SIMULATOR,
+                to_agent=ActorName.ORCHESTRATOR,
+            ),
+        )
 
     def stop_monitor(self):
         self.system.tell(self.monitor_actor, ActorExitRequest())

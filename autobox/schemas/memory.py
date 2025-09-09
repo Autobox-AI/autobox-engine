@@ -1,6 +1,7 @@
 import json
+from collections import deque
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Deque, Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -12,22 +13,26 @@ class Memory(BaseModel):
         default=[], description="List of messages between agents"
     )
     internal: List[str] = Field(default=[], description="List of internal of the agent")
-    pending: Dict[str, datetime] = Field(
-        default={}, description="List of messages pending to be processed"
+    pending: Dict[str, Deque[datetime]] = Field(
+        default_factory=dict, description="FIFO queue of pending messages per agent"
     )
 
     def add_message(self, message: Any):
         self.history.append(message)
 
     def add_pending(self, agent_id: str):
-        self.pending[agent_id] = datetime.now()
+        if agent_id not in self.pending:
+            self.pending[agent_id] = deque()
+        self.pending[agent_id].append(datetime.now())
 
     def add_internal(self, message: str):
         self.internal.append(message)
 
     def remove_if_pending(self, agent_id: str):
-        if agent_id in self.pending:
-            del self.pending[agent_id]
+        if agent_id in self.pending and self.pending[agent_id]:
+            self.pending[agent_id].popleft()
+            if not self.pending[agent_id]:
+                del self.pending[agent_id]
 
     def is_pending(self, agent_id: str):
         return agent_id in self.pending
@@ -39,7 +44,10 @@ class Memory(BaseModel):
         return self.history
 
     def has_pending(self):
-        return len(self.pending) > 0
+        return any(queue for queue in self.pending.values())
+
+    def pending_count(self):
+        return sum(len(queue) for queue in self.pending.values())
 
     def get_history_between_workers(self):
         return [
