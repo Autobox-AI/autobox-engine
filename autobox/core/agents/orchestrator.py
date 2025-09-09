@@ -53,10 +53,8 @@ class Orchestrator(BaseAgent):
         self.metrics_values: Dict[str, Metric] = {}
         self.metrics_definitions: Dict[str, MetricDefinition] = {}
         self.shutdown_in_progress = False
-        self.shutdown_initiated_at = None
         self.shutdown_grace_period_seconds = None
         self.shutdown_sender = None
-        self.final_status_override = None
 
     def receiveMessage(self, message, sender):
         """Main message handler - delegates to specific handlers based on message type."""
@@ -65,19 +63,11 @@ class Orchestrator(BaseAgent):
             self.handle_init(sender, message)
             return
 
-        if isinstance(message, WakeupMessage):
-            if self.shutdown_in_progress:
-                if self.memory.has_pending():
-                    self.logger.info(
-                        f"Still waiting for pending messages ({self.memory.pending_count()}), Shutdown grace period: {self.shutdown_grace_period_seconds}s"
-                    )
-                    self.wakeupAfter(
-                        timedelta(seconds=self.shutdown_grace_period_seconds)
-                    )
-                else:
-                    self._complete_shutdown()
-                return
-        elif isinstance(message, ActorExitRequest) or isinstance(
+        if isinstance(message, WakeupMessage) and self.shutdown_in_progress:
+            self._handle_wakeup_message()
+            return
+
+        if isinstance(message, ActorExitRequest) or isinstance(
             message, ChildActorExited
         ):
             return
@@ -103,20 +93,18 @@ class Orchestrator(BaseAgent):
                 self._log_unknown_message(message)
 
         except Exception as e:
-            self.logger.error(f"Orchestrator critical error: {e}")
             import traceback
 
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            try:
-                self.simulation_status = SimulationStatus.FAILED
-                self.simulation_summary = f"Orchestrator error: {str(e)}"
-                self._update_status_snapshot()
-            except Exception:
-                pass
+            error_message = f"Orchestrator failed: {e} {traceback.format_exc()}"
+            self.logger.error(error_message)
+            self.simulation_summary = error_message
+            self.status = ActorStatus.FAILED
+            self.simulation_status = SimulationStatus.FAILED
+            self._update_status_snapshot()
 
     def stop_the_world(self):
-        self.send(self.myAddress, ActorExitRequest())
         self.status = ActorStatus.STOPPED
+        self.send(self.myAddress, ActorExitRequest())
         self.logger.info("Orchestrator stopped all agents")
 
     def _evaluate(self):
@@ -159,6 +147,16 @@ class Orchestrator(BaseAgent):
         """Handle metrics message."""
         self.metrics_values = message.metrics
         self._update_status_snapshot()
+
+    def _handle_wakeup_message(self):
+        """Handle wakeup message."""
+        if self.memory.has_pending():
+            self.logger.info(
+                f"Still waiting for pending messages ({self.memory.pending_count()}), Shutdown grace period: {self.shutdown_grace_period_seconds}s"
+            )
+            self.wakeupAfter(timedelta(seconds=self.shutdown_grace_period_seconds))
+        else:
+            self._complete_shutdown()
 
     def _handle_signal_message(self, message, sender):
         """Process various signal messages."""
@@ -215,23 +213,15 @@ class Orchestrator(BaseAgent):
 
     def _initiate_graceful_shutdown(self, sender=None):
         """Phase 1: Initiate graceful shutdown."""
-        import time
-
         if self.shutdown_in_progress:
             self.logger.info("Shutdown already in progress")
             return
 
         self.status = ActorStatus.STOPPING
         self.shutdown_in_progress = True
-        self.shutdown_initiated_at = time.time()
         self.shutdown_sender = sender
 
         self.logger.info("Initiating graceful shutdown...")
-
-        # if self.simulation_status != SimulationStatus.COMPLETED:
-        #     self.simulation_status = SimulationStatus.TIMEOUT
-
-        # self._update_status_snapshot()
 
         for agent_name, agent_address in self.addresses.items():
             self.logger.info(f"Sending STOP signal to {agent_name}")
@@ -252,10 +242,6 @@ class Orchestrator(BaseAgent):
         """Phase 2: Complete the shutdown sequence."""
         self.logger.info("Completing shutdown sequence...")
 
-        import time
-
-        time.sleep(0.1)
-
         self.status = ActorStatus.STOPPED
         self._update_status_snapshot()
 
@@ -264,7 +250,6 @@ class Orchestrator(BaseAgent):
                 self.send(agent_address, ActorExitRequest())
 
         self.shutdown_in_progress = False
-        self.shutdown_initiated_at = None
 
         if self.shutdown_sender:
             self.send(
@@ -357,7 +342,7 @@ class Orchestrator(BaseAgent):
             )
 
         if planner_output.status == SimulationStatus.COMPLETED:
-            self._initiate_reporting()
+            self._summarize()
             return
 
         self.simulation_status = planner_output.status
@@ -385,7 +370,7 @@ class Orchestrator(BaseAgent):
             ),
         )
 
-    def _initiate_reporting(self):
+    def _summarize(self):
         """Start the reporting phase."""
         self.simulation_status = SimulationStatus.SUMMARIZING
         self._update_status_snapshot()

@@ -260,6 +260,7 @@ class TestOrchestratorMessageHandling:
         orchestrator.simulation_progress = 0
         orchestrator.simulation_summary = None
         orchestrator.metrics_values = {}
+        orchestrator.shutdown_grace_period_seconds = 5
 
         stop_msg = SignalMessage(
             type=Signal.STOP, from_agent="simulator", to_agent=ActorName.ORCHESTRATOR
