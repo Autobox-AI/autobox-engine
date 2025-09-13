@@ -243,7 +243,6 @@ class TestOrchestratorMessageHandling:
     def test_stop_signal(self, orchestrator):
         """Test handling STOP signal."""
         orchestrator.send = Mock()
-        orchestrator.wakeupAfter = Mock()
         type(orchestrator).myAddress = Mock()
         sender = Mock()
 
@@ -255,12 +254,7 @@ class TestOrchestratorMessageHandling:
             "worker_1": Mock(),
             "worker_2": Mock(),
         }
-        orchestrator.monitor = orchestrator.addresses["monitor"]
         orchestrator.simulation_status = SimulationStatus.IN_PROGRESS
-        orchestrator.simulation_progress = 0
-        orchestrator.simulation_summary = None
-        orchestrator.metrics_values = {}
-        orchestrator.shutdown_grace_period_seconds = 5
 
         stop_msg = SignalMessage(
             type=Signal.STOP, from_agent="simulator", to_agent=ActorName.ORCHESTRATOR
@@ -268,9 +262,7 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(stop_msg, sender)
 
-        assert orchestrator.status == ActorStatus.STOPPING
-        assert orchestrator.shutdown_in_progress is True
-        assert orchestrator.shutdown_sender == sender
+        assert orchestrator.status == ActorStatus.STOPPED
 
         stop_signal_calls = [
             call
@@ -279,19 +271,8 @@ class TestOrchestratorMessageHandling:
             and isinstance(call[0][1], SignalMessage)
             and call[0][1].type == Signal.STOP
         ]
-        # 6 agents (monitor, planner, evaluator, reporter, 2 workers)
+        # Should send STOP to all 6 agents
         assert len(stop_signal_calls) == 6
-
-        orchestrator._complete_shutdown()
-
-        from autobox.schemas.message import StatusUpdateMessage
-
-        status_update_calls = [
-            call
-            for call in orchestrator.send.call_args_list
-            if len(call[0]) >= 2 and isinstance(call[0][1], StatusUpdateMessage)
-        ]
-        assert len(status_update_calls) >= 1
 
     def test_planner_message_with_instructions(self, orchestrator):
         """Test handling message from planner with instructions."""
@@ -413,7 +394,7 @@ class TestOrchestratorMessageHandling:
 
         orchestrator.receiveMessage(msg, sender)
 
-        assert orchestrator.status == ActorStatus.STOPPING
+        assert orchestrator.status == ActorStatus.COMPLETED
         assert orchestrator.simulation_status == SimulationStatus.COMPLETED
 
         assert len(orchestrator.memory.history) == 1

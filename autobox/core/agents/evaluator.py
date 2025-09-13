@@ -27,14 +27,6 @@ class Evaluator(BaseAgent):
         self.metrics_definitions: List[MetricDefinition] = []
 
     def receiveMessage(self, message, sender):
-        if self.status == ActorStatus.STOPPED:
-            self.logger.debug(
-                f"Evaluator is stopped, skipping message: {type(message).__name__}"
-            )
-            return
-
-        self.memory.add_message(message)
-
         if isinstance(message, InitEvaluator):
             self.metrics_definitions = message.metrics_definitions
             self._initialize_agent(
@@ -51,24 +43,27 @@ class Evaluator(BaseAgent):
                 ),
             )
             self.metrics_values = message.metrics_values
-        elif isinstance(message, InstructionMessage):
+            return
+
+        self.memory.add_message(message)
+
+        if isinstance(message, ActorExitRequest):
+            return self._handle_exit_signal()
+
+        if self.status == ActorStatus.STOPPED:
+            return
+
+        if isinstance(message, InstructionMessage):
             self._handle_instruction(message)
         elif isinstance(message, MetricsSignal):
             self._handle_metrics_signal(sender)
         elif isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
                 self._handle_stop_signal()
-        elif isinstance(message, EvaluationMessage):
-            if self.status == ActorStatus.STOPPED:
-                self.logger.info(
-                    "Evaluator ignoring evaluation request - already stopped"
-                )
                 return
+        elif isinstance(message, EvaluationMessage):
             self.memory.add_message(message)
             self._evaluate(sender, message)
-        elif isinstance(message, ActorExitRequest):
-            self.logger.info(f"Terminating agent: {self.name}")
-            return ActorExitRequest()
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
@@ -106,7 +101,5 @@ class Evaluator(BaseAgent):
             self.metrics_values[metric_update.name].values.append(
                 MetricValue(value=metric_update.value, tags=metric_update.tags)
             )
-
-        self.logger.info(f"Evaluator updated {len(metrics_update.update)} metrics")
 
         self.send(sender, MetricsMessage(metrics=self.metrics_values))

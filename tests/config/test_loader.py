@@ -10,8 +10,6 @@ def test_loader():
     """Test the configuration loader with the test fixture file."""
     config = load_simulation_config("tests/fixtures/simulations/test_simulation.json")
 
-    print(config)
-
     assert config.name == "Test Simulation"
     assert config.max_steps == 150
     assert config.timeout_seconds == 300

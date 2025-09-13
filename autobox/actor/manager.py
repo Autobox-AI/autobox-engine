@@ -1,6 +1,6 @@
 from typing import Any
 
-from thespian.actors import ActorExitRequest, ActorSystem
+from thespian.actors import ActorSystem
 
 from autobox.core.agents.monitor import Monitor
 from autobox.core.agents.orchestrator import Orchestrator
@@ -71,19 +71,28 @@ class ActorManager:
             self.logger.error(f"Failed to send abort signal: {e}")
             raise
 
-    def stop_the_world(self):
-        self.stop_monitor()
-        self.system.ask(
+    def timeout(self):
+        self.system.tell(
             self.orchestrator_actor,
             SignalMessage(
-                type=Signal.STOP,
+                type=Signal.TIMEOUT,
                 from_agent=ActorName.SIMULATOR,
                 to_agent=ActorName.ORCHESTRATOR,
             ),
         )
 
+    def shutdown(self):
+        self.system.shutdown()
+
     def stop_monitor(self):
-        self.system.tell(self.monitor_actor, ActorExitRequest())
+        self.system.tell(
+            self.monitor_actor,
+            SignalMessage(
+                type=Signal.STOP,
+                from_agent=ActorName.SIMULATOR,
+                to_agent=ActorName.MONITOR,
+            ),
+        )
 
     def instruct(self, agent_name: str, instruction: Any):
         self.logger.info(f"Instruction for {agent_name.upper()}: {instruction}")

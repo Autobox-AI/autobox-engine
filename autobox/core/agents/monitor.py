@@ -5,7 +5,6 @@ from datetime import datetime
 from thespian.actors import ActorAddress, ActorExitRequest
 
 from autobox.core.agents.base import BaseAgent
-from autobox.logging.logger import LoggerManager
 from autobox.schemas.actor import ActorName, ActorStatus
 from autobox.schemas.message import (
     InitMonitor,
@@ -17,8 +16,6 @@ from autobox.schemas.message import (
 )
 from autobox.schemas.simulation import SimulationStatus
 
-logger = LoggerManager.get_runner_logger()
-
 
 class Monitor(BaseAgent):
     """
@@ -28,8 +25,8 @@ class Monitor(BaseAgent):
 
     def __init__(self):
         """Initialize with a default status snapshot."""
+        super().__init__(name="monitor")
 
-        self.logger = LoggerManager.get_logger("runner")
         self.status_snapshot = StatusSnapshotMessage(
             status=SimulationStatus.NEW,
             orchestrator_status=ActorStatus.INITIALIZED,
@@ -40,22 +37,25 @@ class Monitor(BaseAgent):
         )
 
     def receiveMessage(self, message, sender):
-        """Handle messages based on type."""
+        if isinstance(message, InitMonitor):
+            self.name = ActorName.MONITOR.value
+            self._ack(sender)
+            return
+
+        self.memory.add_message(message)
+
+        if isinstance(message, ActorExitRequest):
+            return self._handle_exit_signal()
+
         try:
-            if isinstance(message, InitMonitor):
-                self.name = ActorName.MONITOR.value
-                self._ack(sender)
-            elif isinstance(message, StatusRequestSignal):
+            if isinstance(message, StatusRequestSignal):
                 self._handle_status_request(message, sender)
             elif isinstance(message, SignalMessage):
                 self._handle_signal(message, sender)
             elif isinstance(message, StatusUpdateMessage):
                 self._handle_status_update(message, sender)
-            elif isinstance(message, ActorExitRequest):
-                self.logger.info(f"Terminating agent: {self.name}")
-                return ActorExitRequest()
             else:
-                logger.warning(
+                self.logger.warning(
                     f"Monitor received unknown message type: {type(message)}"
                 )
 
@@ -65,7 +65,6 @@ class Monitor(BaseAgent):
 
             self.logger.error(f"Traceback: {traceback.format_exc()}")
 
-            # Still try to respond to status requests even on error
             if isinstance(message, StatusRequestSignal):
                 self.send(sender, self.status_snapshot)
 

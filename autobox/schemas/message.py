@@ -30,6 +30,7 @@ class Signal(str, Enum):
     COMPLETED = "completed"
     PLAN = "plan"
     UNKNOWN = "unknown"
+    TIMEOUT = "timeout"
     ERROR = "error"
     ACKED = "acked"
     SIMULATION = "simulation"

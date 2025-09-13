@@ -1,7 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 
-from thespian.actors import Actor
+from thespian.actors import Actor, ActorExitRequest
 
 from autobox.core.ai.llm import LLM
 from autobox.logging.logger import LoggerManager
@@ -40,14 +40,15 @@ class BaseAgent(Actor, ABC):
     def _handle_stop_signal(self):
         """Common stop signal handling - mark as stopped but don't exit yet."""
         self.status = ActorStatus.STOPPED
-        self.logger.info(
-            f"{self.name.upper()} received STOP signal - shutting down gracefully"
-        )
 
     def _handle_instruction(self, message):
         """Common instruction message handling."""
         self.instruction = message.content
         self.logger.info(f"{self.name} received instruction: {message.content}")
+
+    def _handle_exit_signal(self):
+        self.status = ActorStatus.STOPPED
+        return ActorExitRequest()
 
     def _send_ack(self, sender, content="initialized"):
         """Send acknowledgment message."""

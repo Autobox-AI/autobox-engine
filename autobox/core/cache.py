@@ -37,10 +37,7 @@ class CacheManager:
     """
 
     TERMINAL_STATUSES = {
-        # SimulationStatus.COMPLETED,
-        # SimulationStatus.FAILED,
-        # SimulationStatus.ABORTED,
-        # SimulationStatus.TIMEOUT,
+        ActorStatus.COMPLETED,
         ActorStatus.STOPPED,
         ActorStatus.ERROR,
         ActorStatus.ABORTED,

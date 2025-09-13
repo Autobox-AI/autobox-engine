@@ -23,24 +23,26 @@ class Worker(BaseAgent):
         self.role: str = None
 
     def receiveMessage(self, message, sender):
-        if self.status == ActorStatus.STOPPED:
-            self.logger.debug(
-                f"{self.name.upper()} is stopped, skipping message: {type(message).__name__}"
-            )
-            return
-
         if isinstance(message, InitAgent):
             self._initialize_worker(message, sender)
-        elif isinstance(message, SignalMessage):
+            return
+
+        self.memory.add_message(message)
+
+        if isinstance(message, ActorExitRequest):
+            return self._handle_exit_signal()
+
+        if self.status == ActorStatus.STOPPED:
+            return
+
+        if isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
                 self._handle_stop_signal()
+                return
         elif isinstance(message, InstructionMessage):
             self._handle_instruction(message)
         elif isinstance(message, Message):
             self._process_message(message, sender)
-        elif isinstance(message, ActorExitRequest):
-            self.logger.info(f"Terminating agent: {self.name}")
-            return ActorExitRequest()
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
@@ -68,7 +70,6 @@ class Worker(BaseAgent):
 
     def _process_message(self, message, sender):
         """Process incoming message and generate response."""
-        self.memory.add_message(message)
 
         chat_completion_messages = [
             {

@@ -20,12 +20,6 @@ class Reporter(BaseAgent):
         super().__init__(name=ActorName.REPORTER.value)
 
     def receiveMessage(self, message, sender):
-        if self.status == ActorStatus.STOPPED:
-            self.logger.debug(
-                f"Reporter is stopped, skipping message: {type(message).__name__}"
-            )
-            return
-
         if isinstance(message, InitReporter):
             self._initialize_agent(
                 message,
@@ -34,23 +28,30 @@ class Reporter(BaseAgent):
                 task=message.task,
                 agents=message.workers_info,
             )
-        elif isinstance(message, SignalMessage):
+            return
+
+        self.memory.add_message(message)
+
+        if isinstance(message, ActorExitRequest):
+            return self._handle_exit_signal()
+
+        if self.status == ActorStatus.STOPPED:
+            return
+
+        if isinstance(message, SignalMessage):
             if message.type == Signal.STOP:
                 self._handle_stop_signal()
+                return
         elif isinstance(message, InstructionMessage):
             self._handle_instruction(message)
         elif isinstance(message, ReportMessage):
             self._generate_report(message, sender)
-        elif isinstance(message, ActorExitRequest):
-            self.logger.info(f"Terminating agent: {self.name}")
-            return ActorExitRequest()
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
 
     def _generate_report(self, message: ReportMessage, sender):
         """Generate a report based on conversation history."""
-        self.logger.info("Summarizing...")
 
         self.memory.add_message(message)
 
@@ -71,8 +72,6 @@ class Reporter(BaseAgent):
 
         completion = self.llm.think(chat_completion_messages)
         value: str = completion.choices[0].message.content
-
-        self.logger.info(f"Summary: {value}")
 
         self.send(
             sender,

@@ -23,8 +23,8 @@ class ActorStatus(str, Enum):
     ERROR = "error"
     ABORTED = "aborted"
     STOPPED = "stopped"
-    STOPPING = "stopping"
     FAILED = "failed"
+    TIMEOUT = "timeout"
 
 
 class Actor(BaseModel):

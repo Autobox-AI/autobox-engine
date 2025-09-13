@@ -49,10 +49,10 @@ class Simulator:
             self.logger.warning(
                 f"🔴 Simulation timeout after {self.config.simulation.timeout_seconds}s"
             )
-            self.stop_the_world()
-        finally:
-            await self.cache_manager.stop_monitoring()
-            self.actor_manager.stop_monitor()
+            self.actor_manager.timeout()
+
+        await self.cache_manager.stop_monitoring()
+        self.actor_manager.shutdown()
 
     def _on_status_changed(self, response):
         """Callback for status change events."""
@@ -67,15 +67,15 @@ class Simulator:
         ):
             self.logger.error(f"Status monitoring error: {error}")
 
-    def stop_the_world(self):
-        """Stop the simulation gracefully."""
-        try:
-            self.actor_manager.stop_the_world()
-        except Exception as e:
-            self.logger.debug(
-                f"Could not contact orchestrator for shutdown (expected if already terminated): {e}"
-            )
-            return None
+    # def stop_the_world(self):
+    #     """Stop the simulation gracefully."""
+    #     try:
+    #         self.actor_manager.stop_the_world()
+    #     except Exception as e:
+    #         self.logger.debug(
+    #             f"Could not contact orchestrator for shutdown (expected if already terminated): {e}"
+    #         )
+    #         return None
 
     def init(self):
         self.actor_manager.ask_orchestrator(

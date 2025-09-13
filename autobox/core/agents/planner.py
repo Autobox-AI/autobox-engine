@@ -20,12 +20,6 @@ class Planner(BaseAgent):
         super().__init__(name=ActorName.PLANNER.value)
 
     def receiveMessage(self, message, sender):
-        if self.status == ActorStatus.STOPPED:
-            self.logger.debug(
-                f"Planner is stopped, skipping message: {type(message).__name__}"
-            )
-            return
-
         if isinstance(message, InitPlanner):
             self._initialize_agent(
                 message,
@@ -34,19 +28,27 @@ class Planner(BaseAgent):
                 task=message.task,
                 agents=message.workers_info,
             )
-        elif isinstance(message, SignalMessage):
+            return
+
+        self.memory.add_message(message)
+
+        if isinstance(message, ActorExitRequest):
+            return self._handle_exit_signal()
+
+        if self.status == ActorStatus.STOPPED:
+            return
+
+        if isinstance(message, SignalMessage):
             if message.type == Signal.PLAN:
                 self.plan(sender)
             elif message.type == Signal.STOP:
                 self._handle_stop_signal()
+                return
         elif isinstance(message, InstructionMessage):
             self._handle_instruction(message)
         elif isinstance(message, Message):
             self.memory.add_message(message)
             self.plan(sender, message.content)
-        elif isinstance(message, ActorExitRequest):
-            self.logger.info(f"Terminating agent: {self.name}")
-            return ActorExitRequest()
         else:
             self._log_unknown_message(message)
             self._send_unknown_signal(sender)
@@ -72,7 +74,6 @@ class Planner(BaseAgent):
         completion = self.llm.think(chat_completion_messages, schema=PlannerOutput)
 
         planner_output: PlannerOutput = completion.choices[0].message.parsed
-        self.logger.info(f"Planner reasoning: {planner_output.thinking_process}")
 
         self.memory.add_internal(json.dumps(planner_output.model_dump()))
 

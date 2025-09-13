@@ -133,19 +133,6 @@ class TestSimulator:
 
             assert simulator.actor_manager is not None
 
-    def test_stop_the_world(self, mock_config):
-        """Test stopping the simulation."""
-        with patch("autobox.actor.manager.ActorSystem") as MockActorSystem:
-            mock_system = Mock()
-            MockActorSystem.return_value = mock_system
-
-            simulator = Simulator(mock_config)
-            mock_stop = Mock()
-            simulator.actor_manager.stop_the_world = mock_stop
-
-            simulator.stop_the_world()
-
-            mock_stop.assert_called_once()
 
     def test_status_check(self, mock_config):
         """Test status checking."""

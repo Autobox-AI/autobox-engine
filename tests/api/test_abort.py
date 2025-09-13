@@ -80,7 +80,6 @@ class TestAbortFunctionality:
         orchestrator.simulation_progress = 0
         orchestrator.simulation_summary = None
         orchestrator.metrics_values = {}
-        orchestrator.shutdown_grace_period_seconds = 10  # Add this
         orchestrator.logger = MagicMock()
         orchestrator.wakeupAfter = MagicMock()
 
@@ -96,7 +95,6 @@ class TestAbortFunctionality:
             sender = "test_sender"
             orchestrator._handle_abort_signal(sender)
 
-            assert orchestrator.status == ActorStatus.STOPPING
+            assert orchestrator.status == ActorStatus.ABORTED
             assert orchestrator.simulation_status == SimulationStatus.ABORTED
             assert orchestrator.simulation_summary == "Simulation aborted by user"
-            assert orchestrator.shutdown_in_progress is True

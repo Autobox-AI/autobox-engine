@@ -5,6 +5,7 @@ from typing import Any, Deque, Dict, List
 
 from pydantic import BaseModel, Field
 
+from autobox.schemas.actor import ActorName
 from autobox.schemas.message import Message
 
 
@@ -16,6 +17,12 @@ class Memory(BaseModel):
     pending: Dict[str, Deque[datetime]] = Field(
         default_factory=dict, description="FIFO queue of pending messages per agent"
     )
+    system_agents: set[ActorName] = {
+        ActorName.MONITOR,
+        ActorName.PLANNER,
+        ActorName.EVALUATOR,
+        ActorName.REPORTER,
+    }
 
     def add_message(self, message: Any):
         self.history.append(message)
@@ -36,6 +43,12 @@ class Memory(BaseModel):
 
     def is_pending(self, agent_id: str):
         return agent_id in self.pending
+
+    def is_any_worker_pending(self):
+        worker_names = [
+            name for name in self.pending.keys() if name not in self.system_agents
+        ]
+        return any(self.pending[name] for name in worker_names if name in self.pending)
 
     def get_pending(self):
         return self.pending
