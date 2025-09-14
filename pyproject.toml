@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
+authors = [
+    { name = "Martin D'Agostino", email = "maj.dagostino@gmail.com" }
+]
 dependencies = [
     "fastapi>=0.116.1",
     "openai>=1.99.9",
