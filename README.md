@@ -431,9 +431,9 @@ Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Autobox-AI/autobox-cli/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Autobox-AI/autobox-cli/discussions)
-- **Documentation**: [Wiki](https://github.com/Autobox-AI/autobox-cli/wiki)
+- **Issues**: [GitHub Issues](https://github.com/Autobox-AI/autobox-engine/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Autobox-AI/autobox-engine/discussions)
+- **Documentation**: [Wiki](https://github.com/Autobox-AI/autobox-engine/wiki)
 
 ---
 
