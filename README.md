@@ -9,6 +9,7 @@ A powerful engine for running dynamic agent-based simulations where AI actors in
 ## :warning: Disclaimer
 
 **Note**: This project is currently a proof of concept and not production-ready. It is evolving rapidly toward a stable release. In the interim:
+
 - Code cleanup and de-duplication are in progress; expect redundant or experimental code paths.
 - APIs/CLIs/configs are unstable and may change without notice.
 - Tests are incomplete; coverage and reliability work is ongoing.
@@ -17,7 +18,6 @@ A powerful engine for running dynamic agent-based simulations where AI actors in
 - Documentation may lag behind the code and contain gaps.
 - CI/CD, linting, and type checks are being standardized and may be flaky.
 - Dependency versions may change until a stable release.
-
 
 ## Quick Start
 
@@ -116,12 +116,14 @@ uv run autobox-safe --config examples/simulations/summer_vacation.json --metrics
 ### Running with Docker
 
 **Intelligent Port Mapping:** The Docker container automatically:
+
 - Reads the server port from your server configuration file
 - Finds a free port on the host (starting from the configured port)
 - Maps the host port to the container port
 - Falls back to Docker's random port assignment if needed
 
 For example, if your server config specifies port 9000 but it's already in use:
+
 - The script will try ports 9001, 9002, etc., until it finds a free one
 - It will inform you which port was actually used
 - You can override this with `--host-port` to specify an exact port
@@ -185,6 +187,7 @@ The server behavior can be configured through JSON files in `examples/server/`:
 ```
 
 **Server Lifecycle Options:**
+
 - `exit_on_completion: false` (default) - Server keeps running after simulation completes, useful for:
   - Reviewing final results via API
   - Running multiple simulations
@@ -195,6 +198,7 @@ The server behavior can be configured through JSON files in `examples/server/`:
   - Batch processing
 
 Example usage:
+
 ```bash
 # Keep server running after simulation
 uv run autobox --config examples/simulations/summer_vacation.json \
@@ -229,12 +233,14 @@ curl -X POST http://localhost:<PORT>/abort
 ```
 
 **Abort Endpoint Features:**
+
 - **Graceful Shutdown**: Sends ABORT signal to orchestrator which stops all agents cleanly
 - **Immediate Response**: Returns 202 Accepted with status message
 - **Status Update**: Automatically updates simulation status to "aborted"
 - **Safe Operation**: If no simulation is running, returns an error message
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -254,12 +260,14 @@ curl -X POST http://localhost:<PORT>/instructions/agents/{agent_name} \
 ```
 
 **Key Features:**
+
 - **Dynamic Guidance**: Send instructions to any agent during simulation execution
-- **Non-blocking**: Returns immediately (202 Accepted) while instruction is processed asynchronously  
+- **Non-blocking**: Returns immediately (202 Accepted) while instruction is processed asynchronously
 - **Agent-Specific**: Target individual agents by name (e.g., `WORKER_1`, `WORKER_2`)
 - **Real-time Control**: Influence agent behavior without restarting the simulation
 
 **Example Use Cases:**
+
 ```bash
 # Guide a travel agent to consider specific preferences
 curl -X POST http://localhost:<PORT>/instructions/agents/TRAVEL_AGENT \
@@ -419,8 +427,14 @@ Test data is stored in `tests/fixtures/` to keep test configurations separate fr
 
 ## License
 
-[Your License Here]
+Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 
-## Contributing
+## Support
 
-[Contributing Guidelines]
+- **Issues**: [GitHub Issues](https://github.com/Autobox-AI/autobox-cli/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Autobox-AI/autobox-cli/discussions)
+- **Documentation**: [Wiki](https://github.com/Autobox-AI/autobox-cli/wiki)
+
+---
+
+Built with ❤️ by the Autobox team
