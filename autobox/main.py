@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 import uvicorn
 
@@ -91,12 +92,14 @@ async def main():
     simulator = Simulator(config=config)
 
     simulation_id = simulator.agent_ids_by_name.get("orchestrator", "unknown")
+    external_port = os.environ.get("AUTOBOX_EXTERNAL_PORT", str(config.server.port))
+
     app_logger.info("=" * 60)
     app_logger.info(f"🚀 Simulation: {config.simulation.name}")
     app_logger.info(f"📝 Simulation ID: {simulation_id}")
     app_logger.info(f"⏱️ Timeout: {config.simulation.timeout_seconds} seconds")
-    app_logger.info(f"🔍 Status: http://localhost:{config.server.port}/status")
-    app_logger.info(f"📊 Metrics: http://localhost:{config.server.port}/metrics")
+    app_logger.info(f"🔍 Status: http://localhost:{external_port}/status")
+    app_logger.info(f"📊 Metrics: http://localhost:{external_port}/metrics")
     app_logger.info("=" * 60)
 
     runner = Runner(simulator=simulator)
