@@ -4,6 +4,7 @@ from pydantic import BaseModel, field_validator
 
 from autobox.schemas.ai import OpenAIModel
 from autobox.schemas.metrics import MetricType
+from autobox.utils.name_sanitizer import sanitize_agent_name
 
 
 class LoggingConfig(BaseModel):
@@ -31,7 +32,11 @@ class AgentConfig(BaseModel):
     @classmethod
     def transform_name(cls, v):
         if isinstance(v, str):
-            return v.lower()
+            lowered = v.lower()
+            sanitized = sanitize_agent_name(lowered)
+            if lowered != sanitized:
+                print(f"⚠️  Sanitizing agent name: '{lowered}' -> '{sanitized}'")
+            return sanitized
         return v
 
 
