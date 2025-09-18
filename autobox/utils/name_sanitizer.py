@@ -54,6 +54,8 @@ def sanitize_agent_name(name: str) -> str:
 
     safe_name = " ".join(safe_name.split())
 
+    safe_name = safe_name.replace(" ", "_")
+
     return safe_name.strip()
 
 

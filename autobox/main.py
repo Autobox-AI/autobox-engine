@@ -100,6 +100,9 @@ async def main():
     app_logger.info(f"⏱️ Timeout: {config.simulation.timeout_seconds} seconds")
     app_logger.info(f"🔍 Status: http://localhost:{external_port}/status")
     app_logger.info(f"📊 Metrics: http://localhost:{external_port}/metrics")
+    app_logger.info(
+        f"💬 Instructions: http://localhost:{external_port}/instructions/agents/AGENT_NAME"
+    )
     app_logger.info("=" * 60)
 
     runner = Runner(simulator=simulator)
