@@ -12,7 +12,8 @@ NC='\033[0m' # No Color
 # Default values
 TAG="latest"
 PUSH=false
-PLATFORM="linux/amd64"
+# Default to native architecture
+PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/')"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
