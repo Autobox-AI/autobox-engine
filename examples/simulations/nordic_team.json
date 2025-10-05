@@ -1,0 +1,88 @@
+{
+  "name": "Nordic Team Planning",
+  "max_steps": 10,
+  "timeout_seconds": 60,
+  "shutdown_grace_period_seconds": 3,
+  "description": "A team with Nordic names plans a project",
+  "task": "Plan a software development project",
+  "evaluator": {
+    "name": "evaluator",
+    "mailbox": {
+      "max_size": 400
+    },
+    "llm": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.1
+    }
+  },
+  "reporter": {
+    "name": "reporter",
+    "mailbox": {
+      "max_size": 400
+    },
+    "llm": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.7
+    }
+  },
+  "planner": {
+    "name": "planner",
+    "mailbox": {
+      "max_size": 400
+    },
+    "llm": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.7
+    }
+  },
+  "orchestrator": {
+    "name": "orchestrator",
+    "mailbox": {
+      "max_size": 400
+    },
+    "llm": {
+      "model": "gpt-4o-mini"
+    }
+  },
+  "workers": [
+    {
+      "name": "ANNA BERGSTRÖM",
+      "backstory": "Senior software architect from Stockholm",
+      "role": "Lead the technical architecture decisions",
+      "mailbox": {
+        "max_size": 400
+      },
+      "llm": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.7
+      }
+    },
+    {
+      "name": "Erik Söderberg",
+      "backstory": "Full-stack developer from Gothenburg",
+      "role": "Implement the main features",
+      "mailbox": {
+        "max_size": 400
+      },
+      "llm": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.7
+      }
+    },
+    {
+      "name": "Åsa Lindqvist",
+      "backstory": "UX designer from Malmö",
+      "role": "Design the user interface",
+      "mailbox": {
+        "max_size": 400
+      },
+      "llm": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.7
+      }
+    }
+  ],
+  "logging": {
+    "verbose": true
+  }
+}

@@ -4,7 +4,7 @@
   "description": "TypeScript implementation of Autobox simulation runtime",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch --clear-screen=true src/index.ts --duration=5",
+    "dev": "tsx watch --clear-screen=true src/index.ts --config=./examples",
     "build": "tsc",
     "start": "node dist/index.js",
     "start:cli": "node dist/index.js --cli",
@@ -26,6 +26,7 @@
     "@types/swagger-ui-express": "^4.1.8",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.58.7",
+    "commander": "^14.0.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",

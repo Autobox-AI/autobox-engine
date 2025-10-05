@@ -1,0 +1,111 @@
+{
+    "name": "Crime Detective",
+	"max_steps": 150,
+	"timeout_seconds": 300,
+	"shutdown_grace_period_seconds": 5,
+	"description": "This simulation is about a detective that needs to solve a crime.",
+	"task": "A crime needs to be solved: Detective Graves must solve the murder of a prominent art dealer found dead at a high-society gala, with clues pointing to 3 suspects: a SINGER, a DRIVER and a BANKER.",
+    "evaluator": {
+        "name": "EVALUATOR",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "reporter": {
+        "name": "REPORTER",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "planner": {
+        "name": "PLANNER",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "orchestrator": {
+        "name": "ORCHESTRATOR",
+        "mailbox": {
+            "max_size": 400
+        },
+        "llm": {
+            "model": "o4-mini"
+        }
+    },
+    "workers": [
+		{
+			"name": "DETECTIVE_GRAVES",
+			"description": "this is an agent",
+			"role": "A veteran investigator from Scotland Yard, known for his methodical approach and determination to solve complex cases.",
+			"backstory": "A veteran of Scotland Yard, Detective Graves is a methodical and determined investigator with a sharp mind and a keen sense of justice. Haunted by the unsolved case of “The Rose Phantom,” Graves has dedicated his life to solving the city’s most perplexing crimes. His relentless pursuit of the truth often leads him into dangerous territories, but his unwavering integrity sets him apart from his peers.",
+			"llm": {
+				"model": "o4-mini"
+			},
+			"mailbox": {
+				"max_size": 100
+			}
+		},
+		{
+			"name": "SINGER",
+			"description": "this is an agent",
+			"role": "A renowned opera singer with a mysterious past and connections to London’s underworld, skilled in uncovering secrets from high society.",
+			"backstory": "A renowned opera singer, Evelyn’s mesmerizing voice hides a tumultuous past. Raised in an orphanage, she clawed her way to stardom, but her connections to London’s underworld remain shadowy. Known for her charm and cunning, Evelyn has a talent for extracting secrets from high society.",
+			"llm": {
+				"model": "gpt-3.5-turbo"
+			},
+			"mailbox": {
+				"max_size": 100
+			}
+		},
+		{
+			"name": "DRIVER",
+			"description": "this is an agent",
+			"role": "A taxi driver from London.",
+			"backstory": "A feared enforcer in London's criminal underworld, Viper is known for his ruthlessness and efficiency. With a cold demeanor and a scar across his left cheek, he operates in the shadows, ensuring debts are paid and rivalries settled. Despite his menacing reputation, little is known about his true origins. You were the murderer of a prominent art dealer found dead at a high-society gala BUT you have to hide it from the detective.",
+			"llm": {
+				"model": "gpt-3.5-turbo"
+			},
+			"mailbox": {
+				"max_size": 100
+			}
+		},
+		{
+			"name": "BANKER",
+			"description": "this is an agent",
+			"role": "A disgraced former banker, now running a seedy gambling den.",
+			"backstory": "A disgraced former banker, Reggie lost everything in a scandal involving embezzlement. Bitter and desperate, he now runs a seedy gambling den. His once luxurious lifestyle reduced to ruins, Reggie is willing to do anything to regain his former glory, including dabbling in dangerous alliances.",
+			"llm": {
+				"model": "gpt-3.5-turbo"
+			},
+			"mailbox": {
+				"max_size": 100
+			}
+		},
+		{
+			"name": "FORENSIC",
+			"description": "this is an agent",
+			"role": "A brilliant but eccentric forensic pathologist.",
+			"backstory": "A brilliant but eccentric forensic pathologist, Dr. Ashcroft has a reputation for being able to uncover the smallest details in a crime scene. Her unconventional methods and obsession with solving crimes often put her at odds with her peers, but her results are undeniable.",
+			"llm": {
+				"model": "gpt-3.5-turbo"
+			},
+			"mailbox": {
+				"max_size": 100
+			}
+		}
+	],
+    "logging": {
+        "verbose": false,
+        "log_path": "logs",
+        "log_file": "crime_detective.log"
+    }
+}

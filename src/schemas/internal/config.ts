@@ -1,22 +1,15 @@
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { MetricsConfigSchema } from './metricsConfig';
+import { ServerConfigSchema } from './serverConfig';
+import { SimulationConfigSchema } from './simulationConfig';
 
-export const EnvironmentSchema = z.object({
-  PORT: z
-    .string()
-    .transform((val) => Number(val))
-    .default('4000'),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  REDIS_TIMEOUT: z
-    .string()
-    .transform((val) => Number(val))
-    .default('2000'),
-  REDIS_HOST: z.string().default('host.docker.internal'),
-  REDIS_PORT: z
-    .string()
-    .transform((val) => Number(val))
-    .default('6379'),
-  JWT_SECRET: z.string().min(1),
-  JWT_EXPIRES_IN: z.string().min(1),
+extendZodWithOpenApi(z);
+
+export const ConfigSchema = z.object({
+  simulation: SimulationConfigSchema,
+  metrics: MetricsConfigSchema,
+  server: ServerConfigSchema,
 });
 
-export type Environment = z.infer<typeof EnvironmentSchema>;
+export type Config = z.infer<typeof ConfigSchema>;

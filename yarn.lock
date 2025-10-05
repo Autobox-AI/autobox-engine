@@ -1155,6 +1155,7 @@ __metadata:
     "@typescript-eslint/parser": "npm:^8.44.0"
     bcrypt: "npm:^6.0.0"
     bullmq: "npm:^5.58.7"
+    commander: "npm:^14.0.1"
     concurrently: "npm:^9.2.1"
     cors: "npm:^2.8.5"
     dotenv: "npm:^17.2.2"
@@ -1450,6 +1451,13 @@ __metadata:
     color-convert: "npm:^3.0.1"
     color-string: "npm:^2.0.0"
   checksum: 10c0/a5eeee197651a5fe84ab578a8477827e2c2e56b82832aae2b6c60469240be3bc1f03f99686223b1c4e48107c9e20b980475524faab7e6bab1cb9104313910f0e
+  languageName: node
+  linkType: hard
+
+"commander@npm:^14.0.1":
+  version: 14.0.1
+  resolution: "commander@npm:14.0.1"
+  checksum: 10c0/64439c0651ddd01c1d0f48c8f08e97c18a0a1fa693879451f1203ad01132af2c2aa85da24cf0d8e098ab9e6dc385a756be670d2999a3c628ec745c3ec124587b
   languageName: node
   linkType: hard
 

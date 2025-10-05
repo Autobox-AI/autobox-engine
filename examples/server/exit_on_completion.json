@@ -1,0 +1,11 @@
+{
+    "host": "0.0.0.0",
+    "port": 9000,
+    "reload": false,
+    "logging": {
+        "verbose": false,
+        "log_path": "logs",
+        "log_file": "server.log"
+    },
+    "exit_on_completion": true
+}

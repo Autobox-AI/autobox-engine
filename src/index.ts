@@ -2,7 +2,7 @@ import express, { Application } from 'express';
 import { exit } from 'process';
 import swaggerUi from 'swagger-ui-express';
 import routes from './api/routes';
-import { runCLI } from './cli';
+import { startSimulation } from './runner';
 // import { initializeRedisClient } from './clients';
 import { logger } from './config';
 import { env } from './config/env';
@@ -40,7 +40,7 @@ async function startServer() {
 startServer().then(() => {
   logger.info('🌐 Express server started in background');
   logger.info('🎯 Starting CLI simulation...');
-  return runCLI();
+  return startSimulation();
 });
 
 export default app;
