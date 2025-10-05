@@ -1,0 +1,1 @@
+export { apiSpec } from './apiSpec';
