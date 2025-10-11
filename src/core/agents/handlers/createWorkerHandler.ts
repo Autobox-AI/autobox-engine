@@ -49,8 +49,6 @@ export const createWorkerHandler = ({
       },
     });
 
-    logger.info(`[${config.name}] thinking...`);
-
     const plannerInstruction = job.data.type === MESSAGE_TYPES.TEXT ? job.data.content : '';
 
     const chatCompletionMessages = [
@@ -70,8 +68,6 @@ export const createWorkerHandler = ({
       logger.error(`[${config.name}] Error thinking:`);
       throw new Error('Error thinking');
     }
-
-    logger.info(`[${config.name}] LLM output: ${llmOutput}`);
 
     const reply = {
       type: MESSAGE_TYPES.TEXT,

@@ -16,7 +16,6 @@ export const createBaseAgent = ({
   const worker = new BullMQWorker<Message>(
     queueName,
     async (job) => {
-      logger.info(`[${config.name}] agent received job:`, job.data);
       return handler(job);
     },
     queueConfig
@@ -30,13 +29,13 @@ export const createBaseAgent = ({
     logger.error(`[${config.name}] Job ${job?.id} failed:`, err);
   });
 
-  worker.on('active', (job) => {
-    logger.info(`[${config.name}] Processing job ${job.id}`);
-  });
+  // worker.on('active', (job) => {
+  //   logger.info(`[${config.name}] Processing job ${job.id}`);
+  // });
 
-  worker.on('completed', (job) => {
-    logger.info(`[${config.name}] Completed job ${job.id}`);
-  });
+  // worker.on('completed', (job) => {
+  //   logger.info(`[${config.name}] Completed job ${job.id}`);
+  // });
 
   const shutdown = async (): Promise<void> => {
     await worker.close();

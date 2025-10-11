@@ -47,6 +47,6 @@ export const createOrchestrator = async ({
   return {
     shutdown,
     handleMessage: handler.handleMessage,
-    startCompletionTimer: handler.startCompletionTimer,
+    getStatus: handler.getStatus,
   };
 };

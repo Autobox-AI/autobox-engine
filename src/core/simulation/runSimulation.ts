@@ -7,9 +7,7 @@ export const runSimulation = async (config: Config): Promise<void> => {
   logger.info(`🎬 Starting simulation`);
 
   const orchestratorCompletionPromise = new Promise<void>((resolve) => {
-    createSimulation(config, resolve).then(({ orchestrator }) => {
-      orchestrator.startCompletionTimer();
-    });
+    createSimulation(config, resolve);
   });
 
   const timeoutMs = config.simulation.timeout_seconds * 1000;

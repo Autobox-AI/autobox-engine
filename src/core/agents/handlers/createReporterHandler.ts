@@ -1,39 +1,32 @@
 import { Job } from 'bullmq';
 import { logger } from '../../../config';
 import { MessageBroker } from '../../../messaging';
-import {
-  AgentConfig,
-  Message,
-  MESSAGE_TYPES,
-  SYSTEM_AGENT_IDS_BY_NAME,
-  WorkersInfo,
-} from '../../../schemas';
-import { createPlannerPrompt, PlannerOutput, PlannerOutputSchema } from '../../llm';
+import { AgentConfig, Message, MESSAGE_TYPES, WorkersInfo } from '../../../schemas';
+import { createReporterPrompt } from '../../llm';
 import { createAiProcessor } from '../../llm/createAiProcessor';
 import { createMemory } from '../../memory';
 import { createMessageSender } from '../utils';
 
-export const createPlannerHandler = ({
+export const createReporterHandler = ({
   id,
   task,
   config,
-  messageBroker,
   workersInfo,
+  messageBroker,
 }: {
   id: string;
   task: string;
   config: AgentConfig;
-  messageBroker: MessageBroker;
   workersInfo: WorkersInfo;
+  messageBroker: MessageBroker;
 }) => {
   let dynamicInstruction: string | null = null;
   const memory = createMemory();
   const { think } = createAiProcessor({
     model: config.llm?.model,
-    schema: PlannerOutputSchema,
-    systemPrompt: createPlannerPrompt({
-      task: task,
-      workersInfo,
+    systemPrompt: createReporterPrompt({
+      task,
+      agents: workersInfo,
       context: config.context,
     }),
   });
@@ -49,39 +42,27 @@ export const createPlannerHandler = ({
       return;
     }
 
-    const history = memory.memoryToHistory({
-      skipKeys: [],
-      agentNames: {
-        [job.data.fromAgentId]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
-        [id]: SYSTEM_AGENT_IDS_BY_NAME.PLANNER,
-      },
-    });
-
     const conversationHistory = job.data.type === MESSAGE_TYPES.TEXT ? job.data.content : '';
 
     const chatCompletionMessages = [
       {
         role: 'user' as const,
-        content: `TASK PLANNER HISTORY: ${JSON.stringify(history)}`,
+        content: `HUMAN INSTRUCTIONS FOR THE SIMULATION: ${dynamicInstruction}`,
       },
       {
         role: 'user' as const,
         content: `CONVERSATION HISTORY: ${conversationHistory}`,
       },
-      {
-        role: 'user' as const,
-        content: `HUMAN USER INSTRUCTIONS: ${dynamicInstruction}`,
-      },
     ];
 
-    const plannerOutput: PlannerOutput = await think({
+    const summary = await think({
       name: config.name,
       messages: chatCompletionMessages,
     });
 
-    if (!plannerOutput) {
-      logger.error(`[${config.name}] Error planning:`);
-      throw new Error('Error planning');
+    if (!summary) {
+      logger.error(`[${config.name}] Error summarizing`);
+      throw new Error('Error summarizing');
     }
 
     try {
@@ -89,7 +70,7 @@ export const createPlannerHandler = ({
         type: MESSAGE_TYPES.TEXT,
         fromAgentId: id,
         toAgentId: job.data.fromAgentId,
-        content: JSON.stringify(plannerOutput),
+        content: summary,
       };
 
       memory.add({ key: job.data.fromAgentId, value: message });

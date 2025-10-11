@@ -1,8 +1,9 @@
 import z from 'zod';
+import { WorkersInfoSchema } from '../../../../../schemas';
 
 export const ReporterPromptParamsSchema = z.object({
   task: z.string(),
-  agents: z.string(),
+  agents: WorkersInfoSchema,
   context: z.string().optional(),
 });
 

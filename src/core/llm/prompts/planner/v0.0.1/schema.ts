@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SimulationStatusSchema } from '../../../../../schemas';
 
 export const PLANNER_STATUSES = {
   IN_PROGRESS: 'in progress',
@@ -26,7 +27,7 @@ export const PlannerOutputSchema = z.object({
   thinkingProcess: z
     .string()
     .describe('Think step by step and explain your decision process. <= 30 words.'),
-  status: PlannerStatusSchema.describe('Whether the task is completed or in progress.'),
+  status: SimulationStatusSchema.describe('Whether the task is completed or in progress.'),
   progress: z.number().describe('The progress of the task. <= 100.'),
   instructions: z
     .array(InstructionSchema)

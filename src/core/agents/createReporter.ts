@@ -1,9 +1,9 @@
 import { MessageBroker } from '../../messaging';
 import { AgentConfig, WorkersInfo } from '../../schemas';
 import { createBaseAgent } from './createBaseAgent';
-import { createPlannerHandler } from './handlers';
+import { createReporterHandler } from './handlers';
 
-export const createPlanner = ({
+export const createReporter = ({
   id,
   task,
   config,
@@ -16,16 +16,7 @@ export const createPlanner = ({
   messageBroker: MessageBroker;
   workersInfo: WorkersInfo;
 }) => {
-  // const memory = createMemory();
-  // const llm = createAiProcessor({
-  //   model: config.llm?.model,
-  //   systemPrompt: createWorkerPrompt({
-  //     task: task,
-  //     context: config.context,
-  //   }),
-  // });
-
-  const handler = createPlannerHandler({
+  const handler = createReporterHandler({
     id,
     task,
     config,

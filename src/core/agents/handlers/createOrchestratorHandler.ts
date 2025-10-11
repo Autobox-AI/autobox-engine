@@ -1,5 +1,4 @@
 import { Job } from 'bullmq';
-import { setTimeout } from 'node:timers';
 import { logger } from '../../../config';
 import { MessageBroker } from '../../../messaging';
 import {
@@ -9,6 +8,7 @@ import {
   MESSAGE_TYPES,
   SIGNALS,
   SIMULATION_STATUSES,
+  SimulationStatus,
   SYSTEM_AGENT_IDS_BY_NAME,
 } from '../../../schemas';
 import { PlannerOutputSchema } from '../../llm';
@@ -28,18 +28,15 @@ export const createOrchestratorHandler = ({
   messageBroker: MessageBroker;
   onCompletion?: () => void;
 }) => {
+  let dynamicInstruction: string | null = null;
+  let status: SimulationStatus = SIMULATION_STATUSES.NEW;
   const memory = createMemory();
   const sendMessage = createMessageSender({ config, messageBroker });
 
-  // Track dynamic instructions
-  let dynamicInstruction: string | null = null;
-
-  // logger.info(
-  //   `[${this.name}.handleMessage] ${job.data.fromAgentId} -> ${this.name}: ${job.data.content}`
-  // )
-
   const handleMessage = async (job: Job<Message>): Promise<void> => {
-    logger.info(`[${config.name}] message from ${job.data.fromAgentId} received`);
+    status = SIMULATION_STATUSES.IN_PROGRESS;
+    logger.info(`[${config.name}] message from ${agentIdsByName[job.data.fromAgentId]} received`);
+    logger.info(`[${config.name}] Status: ${status}`);
     memory.add({ key: job.data.fromAgentId, value: job.data });
 
     if (job.data.type === MESSAGE_TYPES.INSTRUCTION) {
@@ -50,12 +47,17 @@ export const createOrchestratorHandler = ({
 
     const fromAgentId = job.data.fromAgentId;
 
+    if (agentIdsByName.reporter === fromAgentId) {
+      status = SIMULATION_STATUSES.COMPLETED;
+      logger.info(`[${config.name}] Signaling simulation completion based on status`);
+      onCompletion?.();
+      return;
+    }
+
     if (fromAgentId === agentIdsByName.return && job.data.type === MESSAGE_TYPES.TEXT) {
       logger.info(`[${config.name}] Summary: ${job.data.content}`);
       return;
     }
-
-    //await new Promise((resolve) => setTimeout(resolve, 1000));
 
     let toAgentId: string;
     let message: Message;
@@ -76,6 +78,8 @@ export const createOrchestratorHandler = ({
     ) {
       toAgentId = agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.PLANNER];
       const plannerOutput = PlannerOutputSchema.parse(JSON.parse(job.data.content));
+
+      status = plannerOutput.status;
 
       if (plannerOutput.status === SIMULATION_STATUSES.COMPLETED) {
         logger.info(`[${config.name}] Planner completed. Sending history to reporter.`);
@@ -139,20 +143,8 @@ export const createOrchestratorHandler = ({
     }
   };
 
-  const startCompletionTimer = () => {
-    setTimeout(
-      () => {
-        logger.info(
-          `[${config.name}] Orchestrator signaling simulation completion after 2 minutes`
-        );
-        onCompletion?.();
-      },
-      2 * 60 * 1000 // 2 minutes
-    );
-  };
-
   return {
     handleMessage,
-    startCompletionTimer,
+    getStatus: () => status,
   };
 };

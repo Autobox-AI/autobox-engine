@@ -1,13 +1,12 @@
 import { randomUUID } from 'crypto';
 import { MessageBroker } from '../../messaging';
 import { AgentNamesByAgentId, Config, WorkersInfo } from '../../schemas';
-import { createOrchestrator, createPlanner, createWorker } from '../agents';
+import { createOrchestrator, createPlanner, createReporter, createWorker } from '../agents';
 import { simulationRegistry } from './registry';
 
 export const createSimulation = async (config: Config, onCompletion?: () => void) => {
   const simulationId = randomUUID();
 
-  // Wrap onCompletion to handle cleanup
   const handleCompletion = () => {
     simulationRegistry.unregister(simulationId);
     onCompletion?.();
@@ -113,6 +112,14 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     messageBroker,
   });
 
+  const reporter = await createReporter({
+    config: config.simulation.reporter,
+    id: agentIdsByName.reporter,
+    task: config.simulation.task,
+    workersInfo,
+    messageBroker,
+  });
+
   const orchestrator = await createOrchestrator({
     agentIdsByName,
     config: config.simulation.orchestrator,
@@ -136,5 +143,5 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
   //   task: request.task,
   // });
 
-  return { simulationId, orchestrator, workers, planner };
+  return { simulationId, orchestrator, workers, planner, reporter };
 };
