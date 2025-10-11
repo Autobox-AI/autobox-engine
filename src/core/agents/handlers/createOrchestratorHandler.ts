@@ -35,7 +35,6 @@ export const createOrchestratorHandler = ({
 
   const handleMessage = async (job: Job<Message>): Promise<void> => {
     status = SIMULATION_STATUSES.IN_PROGRESS;
-    logger.info(`[${config.name}] message from ${agentIdsByName[job.data.fromAgentId]} received`);
     logger.info(`[${config.name}] Status: ${status}`);
     memory.add({ key: job.data.fromAgentId, value: job.data });
 
@@ -127,8 +126,8 @@ export const createOrchestratorHandler = ({
       const history = memory.memoryToHistory({
         skipKeys: [],
         agentNames: {
-          [job.data.fromAgentId]: job.data.fromAgentId,
-          [id]: config.name,
+          [job.data.fromAgentId]: agentIdsByName[job.data.fromAgentId],
+          [id]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
         },
       });
 

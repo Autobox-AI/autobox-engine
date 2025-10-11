@@ -30,7 +30,6 @@ export class MessageBroker {
       logger.error('Available queues:', Object.keys(this.queues));
       throw new Error(`No queue found for agent ${toAgentId}`);
     }
-    logger.info(`[MessageBroker] Sending message to ${toAgentId}:`, message);
     await queue.add(jobName, message);
     // Prevent message flood
     await setTimeout(200);
