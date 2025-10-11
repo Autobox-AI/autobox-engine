@@ -1,3 +1,3 @@
+export { simulationRegistry, SimulationRegistry } from './registry';
+export type { SimulationContext } from './registry';
 export { runSimulation } from './runSimulation';
-export { simulationRegistry, SimulationRegistry } from './SimulationRegistry';
-export type { SimulationContext } from './SimulationRegistry';

@@ -4,10 +4,13 @@ import { z } from 'zod';
 extendZodWithOpenApi(z);
 
 export const AgentConfigSchema = z.object({
-  name: z.string().openapi({
-    description: 'The name of the agent',
-    example: 'EVALUATOR',
-  }),
+  name: z
+    .string()
+    .transform((val) => val.toLowerCase())
+    .openapi({
+      description: 'The name of the agent',
+      example: 'EVALUATOR',
+    }),
   description: z.string().optional().openapi({
     description: 'The description of the agent',
     example: 'The evaluator of the simulation',

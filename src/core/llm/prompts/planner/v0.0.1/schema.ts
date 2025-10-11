@@ -13,7 +13,10 @@ export const PlannerStatusSchema = z.enum([
 export type PlannerStatus = z.infer<typeof PlannerStatusSchema>;
 
 export const InstructionSchema = z.object({
-  agentName: z.string().describe('The name of the agent.'),
+  agentName: z
+    .string()
+    .transform((val) => val.toLowerCase())
+    .describe('The name of the agent.'),
   instruction: z.string().describe('The instruction for the agent.'),
 });
 

@@ -104,11 +104,11 @@ export const createOrchestratorHandler = ({
         );
         const message: Message = {
           fromAgentId: id,
-          toAgentId: agentIdsByName[instruction.agentName.toLowerCase()],
+          toAgentId: agentIdsByName[instruction.agentName],
           type: MESSAGE_TYPES.TEXT,
           content: instruction.instruction,
         };
-        memory.add({ key: agentIdsByName[instruction.agentName.toLowerCase()], value: message });
+        memory.add({ key: agentIdsByName[instruction.agentName], value: message });
         sendMessage(message);
       });
 

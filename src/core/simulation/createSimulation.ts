@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { MessageBroker } from '../../messaging';
 import { AgentNamesByAgentId, Config, WorkersInfo } from '../../schemas';
 import { createOrchestrator, createPlanner, createWorker } from '../agents';
-import { simulationRegistry } from './SimulationRegistry';
+import { simulationRegistry } from './registry';
 
 export const createSimulation = async (config: Config, onCompletion?: () => void) => {
   const simulationId = randomUUID();
@@ -16,7 +16,7 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
   const workerIds = config.simulation.workers.reduce<Record<string, string>>(
     (acc, agent) => ({
       ...acc,
-      [agent.name.toLowerCase()]: randomUUID(),
+      [agent.name]: randomUUID(),
     }),
     {}
   );
@@ -56,7 +56,7 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
   const workers = config.simulation.workers.map((workerConfig) =>
     createWorker({
       config: workerConfig,
-      id: workerIds[workerConfig.name.toLowerCase()],
+      id: workerIds[workerConfig.name],
       task: config.simulation.task,
       messageBroker,
     })

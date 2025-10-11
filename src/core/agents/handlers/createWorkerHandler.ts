@@ -17,7 +17,12 @@ export const createWorkerHandler = ({
   config: AgentConfig;
   messageBroker: MessageBroker;
 }) => {
+  let dynamicInstruction: string | null = null;
+
   const memory = createMemory();
+
+  const sendMessage = createMessageSender({ config, messageBroker });
+
   const { think } = createAiProcessor({
     model: config.llm?.model,
     systemPrompt: createWorkerPrompt({
@@ -26,42 +31,21 @@ export const createWorkerHandler = ({
     }),
   });
 
-  const sendMessage = createMessageSender({ config, messageBroker });
-
-  // Track dynamic instructions
-  let dynamicInstruction: string | null = null;
-
-  // logger.info(
-  //   `[${this.name}.handleMessage] ${job.data.fromAgentId} -> ${this.name}: ${job.data.content}`
-  // )
-
   const handleMessage = async (job: Job<Message>): Promise<void> => {
-    logger.info(`[${config.name}] message from ${job.data.fromAgentId} received`);
+    memory.add({ key: job.data.fromAgentId, value: job.data });
 
-    // Handle instruction messages
     if (job.data.type === MESSAGE_TYPES.INSTRUCTION) {
       dynamicInstruction = job.data.instruction;
       memory.add({ key: 'instructions', value: job.data });
-      logger.info(`[${config.name}] Received new instruction: ${dynamicInstruction}`);
-      return; // Don't process further
+      logger.info(`[${config.name}] Received new dynamic instruction: ${dynamicInstruction}`);
+      return;
     }
-
-    memory.add({ key: job.data.fromAgentId, value: job.data });
-    // await setTimeout(5000);
-    // const fromAgentId = job.data.fromAgentId;
-    // const message = {
-    //   fromAgentId: id,
-    //   toAgentId: fromAgentId,
-    //   content: 'dummy test from worker',
-    // };
-
-    // sendMessage(message);
 
     const history = memory.memoryToHistory({
       skipKeys: [],
       agentNames: {
         [job.data.fromAgentId]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
-        [id]: config.name.toLowerCase(),
+        [id]: config.name,
       },
     });
 
@@ -80,7 +64,7 @@ export const createWorkerHandler = ({
       },
     ];
 
-    const llmOutput = await think(chatCompletionMessages);
+    const llmOutput = await think({ name: config.name, messages: chatCompletionMessages });
 
     if (!llmOutput) {
       logger.error(`[${config.name}] Error thinking:`);

@@ -40,10 +40,6 @@ export const createPlannerHandler = ({
 
   const sendMessage = createMessageSender({ config, messageBroker });
 
-  // logger.info(
-  //   `[${this.name}.handleMessage] ${job.data.fromAgentId} -> ${this.name}: ${job.data.content}`
-  // )
-
   const handleMessage = async (job: Job<Message>): Promise<void> => {
     logger.info(`[${config.name}] message from ${job.data.fromAgentId} received`);
     memory.add({ key: job.data.fromAgentId, value: job.data });
@@ -62,24 +58,27 @@ export const createPlannerHandler = ({
       },
     });
 
-    logger.info(`[${config.name}] thinking...`);
-
     const conversationHistory = job.data.type === MESSAGE_TYPES.TEXT ? job.data.content : '';
 
-    const plannerOutput: PlannerOutput = await think([
+    const chatCompletionMessages = [
       {
-        role: 'user',
+        role: 'user' as const,
         content: `TASK PLANNER HISTORY: ${JSON.stringify(history)}`,
       },
       {
-        role: 'user',
+        role: 'user' as const,
         content: `CONVERSATION HISTORY: ${conversationHistory}`,
       },
       {
-        role: 'user',
+        role: 'user' as const,
         content: `HUMAN USER INSTRUCTIONS: ${dynamicInstruction}`,
       },
-    ]);
+    ];
+
+    const plannerOutput: PlannerOutput = await think({
+      name: config.name,
+      messages: chatCompletionMessages,
+    });
 
     if (!plannerOutput) {
       logger.error(`[${config.name}] Error planning:`);

@@ -18,7 +18,15 @@ export const createAiProcessor = ({
 }) => {
   const openai: OpenAI = new OpenAI();
 
-  const think = async (messages: ChatCompletionMessageParam[]): Promise<any> => {
+  const think = async ({
+    name,
+    messages,
+  }: {
+    name: string;
+    messages: ChatCompletionMessageParam[];
+  }): Promise<any> => {
+    logger.info(`[${name}] thinking...`);
+
     const completionMessages = [
       { role: 'system', content: systemPrompt } as ChatCompletionMessageParam,
       ...messages,
