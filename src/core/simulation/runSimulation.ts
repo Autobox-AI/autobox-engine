@@ -1,37 +1,28 @@
-import { setTimeout } from 'timers/promises';
-import { logger, simulationsQueue } from '../../config';
+import { setTimeout } from 'node:timers';
+import { logger } from '../../config';
 import { Config } from '../../schemas';
-import { prepareRun } from './prepare';
+import { createSimulation } from './createSimulation';
 
-export const runSimulation = async (_config: Config): Promise<void> => {
-  // logger.info(`🎬 Starting simulation (will run for ${durationMinutes} minutes)`);
-  // prepare run
-  // create worker
-  // run simulation
+export const runSimulation = async (config: Config): Promise<void> => {
+  logger.info(`🎬 Starting simulation`);
 
-  const { simulationId } = await prepareRun(_config);
+  const orchestratorCompletionPromise = new Promise<void>((resolve) => {
+    createSimulation(config, resolve).then(({ orchestrator }) => {
+      orchestrator.startCompletionTimer();
+    });
+  });
 
-  await simulationsQueue.add(
-    'simulation',
-    {
-      simulationId,
-      timeoutSeconds: 10,
-    },
-    { jobId: simulationId }
-  );
+  const timeoutMs = config.simulation.timeout_seconds * 1000;
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      logger.info('⏰ Simulation timeout reached');
+      resolve();
+    }, timeoutMs);
+  });
 
-  const startTime = Date.now();
-  const durationMs = 60 * 1000;
-  let iteration = 0;
+  logger.info('🔄 Simulation running... waiting for orchestrator completion or timeout');
 
-  while (Date.now() - startTime < durationMs) {
-    iteration++;
-    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-    logger.info(`🔄 Iteration ${iteration} - Elapsed: ${elapsedSeconds}s`);
-
-    // Simulate work
-    await setTimeout(20000);
-  }
+  await Promise.race([orchestratorCompletionPromise, timeoutPromise]);
 
   logger.info('✅ Simulation completed');
 };

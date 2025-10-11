@@ -7,7 +7,7 @@ const queueConfig = {
   autorun: true,
 };
 
-const simulationsQueue = new Queue(`simulation`, {
+const simulationsQueue = new Queue(`autobox`, {
   connection: redisConfig,
 });
 

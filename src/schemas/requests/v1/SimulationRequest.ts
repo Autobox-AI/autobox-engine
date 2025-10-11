@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-export const AgentBaseRequestSchema = z.object({
+export const AgentRequestSchema = z.object({
   name: z.string().openapi({
     description: 'The name of the agent',
     example: 'EVALUATOR',
@@ -22,16 +22,9 @@ export const AgentBaseRequestSchema = z.object({
     description: 'The instruction of the agent',
     example: 'The evaluator of the simulation',
   }),
-});
-
-export const WorkerRequestSchema = AgentBaseRequestSchema.extend({
-  role: z.string().openapi({
-    description: 'The role of the agent',
-    example: 'The evaluator of the simulation',
-  }),
-  backstory: z.string().openapi({
-    description: 'The backstory of the agent',
-    example: 'The evaluator of the simulation',
+  context: z.string().optional().openapi({
+    description: 'The context of the agent',
+    example: 'The role of this agent is to evaluate the simulation and report the results.',
   }),
 });
 
@@ -58,11 +51,11 @@ export const SimulationRequestSchema = z.object({
     example:
       'Ana and John need to decide together a destiny for our summer vacation. As soon as they agree, the simulation should end.',
   }),
-  evaluator: AgentBaseRequestSchema,
-  reporter: AgentBaseRequestSchema,
-  planner: AgentBaseRequestSchema,
-  orchestrator: AgentBaseRequestSchema,
-  workers: z.array(WorkerRequestSchema),
+  evaluator: AgentRequestSchema,
+  reporter: AgentRequestSchema,
+  planner: AgentRequestSchema,
+  orchestrator: AgentRequestSchema,
+  workers: z.array(AgentRequestSchema),
   logging: z.object({
     verbose: z.boolean().openapi({
       description: 'The verbose of the logging',

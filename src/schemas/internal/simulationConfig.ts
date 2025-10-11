@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-export const AgentBaseConfigSchema = z.object({
+export const AgentConfigSchema = z.object({
   name: z.string().openapi({
     description: 'The name of the agent',
     example: 'EVALUATOR',
@@ -13,27 +13,29 @@ export const AgentBaseConfigSchema = z.object({
     example: 'The evaluator of the simulation',
   }),
   llm: z.object({
-    model: z.string().openapi({
-      description: 'The model of the agent',
-      example: 'gpt-4o',
-    }),
+    model: z
+      .string()
+      .openapi({
+        description: 'The model of the agent',
+        example: 'gpt-4o',
+      })
+      .default('gpt-5-nano'),
   }),
   instruction: z.string().optional().openapi({
     description: 'The instruction of the agent',
     example: 'The evaluator of the simulation',
   }),
+  context: z
+    .string()
+    .optional()
+    .openapi({
+      description: 'The context of the agent',
+      example: 'The role of this agent is to evaluate the simulation and report the results.',
+    })
+    .default(''),
 });
 
-export const WorkerConfigSchema = AgentBaseConfigSchema.extend({
-  role: z.string().openapi({
-    description: 'The role of the agent',
-    example: 'The evaluator of the simulation',
-  }),
-  backstory: z.string().openapi({
-    description: 'The backstory of the agent',
-    example: 'The evaluator of the simulation',
-  }),
-});
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
 export const SimulationConfigSchema = z.object({
   name: z.string().openapi({
@@ -58,11 +60,11 @@ export const SimulationConfigSchema = z.object({
     example:
       'Ana and John need to decide together a destiny for our summer vacation. As soon as they agree, the simulation should end.',
   }),
-  evaluator: AgentBaseConfigSchema,
-  reporter: AgentBaseConfigSchema,
-  planner: AgentBaseConfigSchema,
-  orchestrator: AgentBaseConfigSchema,
-  workers: z.array(WorkerConfigSchema),
+  evaluator: AgentConfigSchema,
+  reporter: AgentConfigSchema,
+  planner: AgentConfigSchema,
+  orchestrator: AgentConfigSchema,
+  workers: z.array(AgentConfigSchema),
   logging: z.object({
     verbose: z.boolean().openapi({
       description: 'The verbose of the logging',

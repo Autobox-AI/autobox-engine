@@ -1,76 +1,44 @@
 import { Worker as BullMQWorker, Job } from 'bullmq';
-import { logger, redisConfig } from '../../config';
+import { logger, redisConfig, simulationsQueue } from '../../config';
 
-export const createWorker = async (): Promise<BullMQWorker> => {
-  return new BullMQWorker(
-    'simulation',
-    async (job) => {
-      await run(job);
-    },
-    {
-      connection: redisConfig,
-    }
-  );
-};
+export const createExecutor = async (simulationId: string) => {
+  const dispatch = async (): Promise<void> => {
+    await simulationsQueue.add(
+      'simulation',
+      {
+        simulationId,
+        timeoutSeconds: 10,
+      },
+      { jobId: simulationId }
+    );
+  };
 
-const run = async (job: Job): Promise<{ success: boolean; message: string }> => {
-  logger.info(`Processing job: ${job.id}`);
-  // const { timeoutSeconds } = job.data;
-  logger.info(
-    // `Running simulation: ${this.simulationId} with parameters: ${JSON.stringify(job.data)}`
-    `Running simulation: X with parameters: ${JSON.stringify(job.data)}`
-  );
-  return { success: true, message: 'Simulation completed' };
-  // const startTime = Date.now();
-  // try {
-  //   const timeoutController = new AbortController();
-  //   const timeoutPromise = new Promise<never>((_, reject) => {
-  //     const timeoutId = setTimeout(() => {
-  //       reject(
-  //         new Error(`Simulation ${this.simulationId} timeout after ${timeoutSeconds} seconds`)
-  //       );
-  //     }, timeoutSeconds * 1000);
+  const run = async (job: Job): Promise<{ success: boolean; message: string }> => {
+    logger.info(`Processing job: ${job.id}`);
+    // const { timeoutSeconds } = job.data;
+    logger.info(
+      // `Running simulation: ${this.simulationId} with parameters: ${JSON.stringify(job.data)}`
+      `Running simulation: X with parameters: ${JSON.stringify(job.data)}`
+    );
+    return { success: true, message: 'Simulation completed' };
+  };
 
-  //     timeoutController.signal.addEventListener('abort', () => {
-  //       clearTimeout(timeoutId);
-  //     });
-  //   });
+  const createJobWorker = async (): Promise<BullMQWorker> => {
+    return new BullMQWorker(
+      'simulation',
+      async (job) => {
+        await run(job);
+      },
+      {
+        connection: redisConfig,
+      }
+    );
+  };
 
-  //   try {
-  //     await Promise.race([
-  //       this.orchestrator.runUntilCompletion().then((result) => {
-  //         timeoutController.abort();
-  //         return result;
-  //       }),
-  //       timeoutPromise,
-  //     ]);
-
-  //     const timeDuration = formatTimeDuration(startTime);
-  //     logger.info(
-  //       `Simulation ${this.simulationId} completed for job: ${job.id} in ${timeDuration}`
-  //     );
-
-  //     await updateRun({
-  //       runId: this.id,
-  //       progress: 100,
-  //       status: 'completed',
-  //       finishedAt: new Date().toISOString(),
-  //     });
-
-  //     return {
-  //       success: true,
-  //       message: `Simulation ${this.simulationId} finished successfully in ${timeDuration}`,
-  //     };
-  //   } catch (error) {
-  //     throw error;
-  //   } finally {
-  //     await this.cleanup();
-  //   }
-  // } catch (error: unknown) {
-  //   const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-  //   logger.error(`Simulation failed: ${errorMessage}`);
-  //   return { success: false, message: errorMessage };
-  // }
+  return {
+    dispatch,
+    createJobWorker,
+  };
 };
 
 // export class Run {

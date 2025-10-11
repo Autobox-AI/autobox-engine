@@ -1,3 +1,4 @@
+export { DEFAULT_OPEN_AI_MODEL } from './constants';
 export { env } from './env';
 export { loadConfig } from './loader';
 export { logger } from './logger';
