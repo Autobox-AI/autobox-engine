@@ -1,7 +1,13 @@
 import { randomUUID } from 'crypto';
 import { logger } from '../../config';
 import { MessageBroker } from '../../messaging';
-import { AgentNamesByAgentId, Config, WorkersInfo } from '../../schemas';
+import {
+  AgentIdsByName,
+  AgentNamesById,
+  Config,
+  SIMULATION_STATUSES,
+  WorkersInfo,
+} from '../../schemas';
 import { createOrchestrator, createPlanner, createReporter, createWorker } from '../agents';
 import { simulationRegistry } from './registry';
 
@@ -21,12 +27,19 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     {}
   );
 
-  const agentIdsByName: AgentNamesByAgentId = {
+  const agentIdsByName: AgentIdsByName = {
     orchestrator: randomUUID(),
     planner: randomUUID(),
     evaluator: randomUUID(),
     reporter: randomUUID(),
     ...workerIds,
+  };
+  const agentNamesById: AgentNamesById = {
+    [agentIdsByName.orchestrator]: 'orchestrator',
+    [agentIdsByName.planner]: 'planner',
+    [agentIdsByName.evaluator]: 'evaluator',
+    [agentIdsByName.reporter]: 'reporter',
+    ...Object.fromEntries(Object.entries(workerIds).map(([key, value]) => [value, key])),
   };
 
   logger.info(`[${config.simulation.name}] Agent IDs:`, agentIdsByName);
@@ -47,12 +60,17 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
 
   const messageBroker = new MessageBroker(agentIdsByName);
 
-  // Register simulation in the registry for API access
   simulationRegistry.register({
     simulationId,
     messageBroker,
     agentIdsByName,
+    agentNamesById,
     startedAt: new Date(),
+    status: SIMULATION_STATUSES.NEW,
+    progress: 0,
+    summary: null,
+    lastUpdated: new Date(),
+    error: null,
   });
 
   const workers = config.simulation.workers.map((workerConfig) =>
@@ -124,6 +142,7 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
   });
 
   const orchestrator = await createOrchestrator({
+    simulationId,
     agentIdsByName,
     config: config.simulation.orchestrator,
     messageBroker,

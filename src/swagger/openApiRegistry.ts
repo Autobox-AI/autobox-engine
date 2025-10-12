@@ -1,7 +1,12 @@
 import { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 
-import { HealthResponseSchema, InstructionRequestSchema, MetricsResponseSchema } from '../schemas';
+import {
+  HealthResponseSchema,
+  InstructionRequestSchema,
+  MetricsResponseSchema,
+  StatusResponseSchema,
+} from '../schemas';
 
 const openApiRegistry = new OpenAPIRegistry();
 
@@ -112,11 +117,30 @@ const postAbortV1 = {
   },
 };
 
+const getStatusV1 = {
+  method: 'get' as const,
+  path: '/v1/status',
+  summary: 'Get status of a simulation',
+  description: 'Get status of a simulation',
+  tags: ['simulations'],
+  responses: {
+    200: {
+      description: 'Ok',
+      content: {
+        'application/json': {
+          schema: StatusResponseSchema,
+        },
+      },
+    },
+  },
+};
+
 openApiRegistry.registerPath(ping);
 openApiRegistry.registerPath(health);
 openApiRegistry.registerPath(getMetricsV1);
 openApiRegistry.registerPath(postInstructionV1);
 openApiRegistry.registerPath(postAbortV1);
+openApiRegistry.registerPath(getStatusV1);
 
 // export const tracesResponse = openApiRegistry.register('TracesResponse', TracesResponseSchema);
 

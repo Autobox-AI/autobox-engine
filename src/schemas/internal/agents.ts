@@ -17,12 +17,19 @@ export const SystemAgentNamesSchema = z.enum([
 
 export type SystemAgentNames = z.infer<typeof SystemAgentNamesSchema>;
 
-export const AgentNamesByAgentIdSchema = z.record(
+export const AgentNamesByIdSchema = z.record(
+  UuidSchema,
+  z.union([z.enum(Object.values(SYSTEM_AGENT_IDS_BY_NAME) as [string, ...string[]]), z.string()])
+);
+
+export type AgentNamesById = z.infer<typeof AgentNamesByIdSchema>;
+
+export const AgentIdsByNameSchema = z.record(
   z.union([z.enum(Object.values(SYSTEM_AGENT_IDS_BY_NAME) as [string, ...string[]]), z.string()]),
   UuidSchema
 );
 
-export type AgentNamesByAgentId = z.infer<typeof AgentNamesByAgentIdSchema>;
+export type AgentIdsByName = z.infer<typeof AgentIdsByNameSchema>;
 
 export const WorkersInfoSchema = z.array(
   z.object({

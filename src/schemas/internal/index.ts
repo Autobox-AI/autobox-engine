@@ -1,19 +1,23 @@
 export {
-  AgentNamesByAgentIdSchema,
+  AgentIdsByNameSchema,
+  AgentNamesByIdSchema,
   SYSTEM_AGENT_IDS_BY_NAME,
   SystemAgentNamesSchema,
   WorkersInfoSchema,
-  type AgentNamesByAgentId,
+  type AgentIdsByName,
+  type AgentNamesById,
   type SystemAgentNames,
   type WorkersInfo,
 } from './agents';
 export { ConfigSchema, type Config } from './config';
+export { type SimulationContext } from './context';
 export { EnvironmentSchema, type Environment } from './environment';
 export {
   BaseMessageSchema,
   HistoryMessageSchema,
   HistorySignalMessageSchema,
   HistoryTextMessageSchema,
+  isInstructionMessage,
   isSignalMessage,
   isTextMessage,
   MESSAGE_TYPES,

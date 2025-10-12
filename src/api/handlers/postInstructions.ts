@@ -13,10 +13,11 @@ export const postInstructions = async (req: Request, res: Response) => {
 
     if (!context) {
       logger.warn(`[postInstructions] Agent ${agentId} not found in any active simulation`);
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Agent not found',
         message: `Agent ${agentId} is not part of any active simulation`,
       });
+      return;
     }
 
     await context.messageBroker.send({
@@ -35,9 +36,12 @@ export const postInstructions = async (req: Request, res: Response) => {
       `[postInstructions] Instruction sent to agent ${agentId} in simulation ${context.simulationId}`
     );
 
+    const agentName = Object.values(context.agentIdsByName).find((id) => id === agentId);
+
     res.status(202).json({
       message: 'Instruction sent successfully',
       agentId,
+      agentName,
       simulationId: context.simulationId,
       instruction,
     });
@@ -48,4 +52,5 @@ export const postInstructions = async (req: Request, res: Response) => {
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
+  return;
 };

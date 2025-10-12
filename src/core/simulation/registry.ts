@@ -1,12 +1,4 @@
-import { MessageBroker } from '../../messaging';
-import { AgentNamesByAgentId } from '../../schemas';
-
-export interface SimulationContext {
-  simulationId: string;
-  messageBroker: MessageBroker;
-  agentIdsByName: AgentNamesByAgentId;
-  startedAt: Date;
-}
+import { SimulationContext, SimulationStatus } from '../../schemas';
 
 /**
  * Singleton registry to track active simulations and their message brokers.
@@ -37,6 +29,23 @@ export class SimulationRegistry {
     return this.simulations.get(simulationId);
   }
 
+  updateStatus(simulationId: string, status: SimulationStatus, progress: number): void {
+    const context = this.get(simulationId);
+    if (context) {
+      context.status = status;
+      context.progress = progress;
+      context.lastUpdated = new Date();
+    }
+  }
+
+  updateSummary(simulationId: string, summary: string): void {
+    const context = this.get(simulationId);
+    if (context) {
+      context.summary = summary;
+      context.lastUpdated = new Date();
+    }
+  }
+
   getByAgentId(agentId: string): SimulationContext | undefined {
     for (const context of this.simulations.values()) {
       const agentIds = Object.values(context.agentIdsByName);
@@ -45,6 +54,10 @@ export class SimulationRegistry {
       }
     }
     return undefined;
+  }
+
+  getFirst(): SimulationContext | undefined {
+    return this.simulations.values().next().value;
   }
 
   getAll(): SimulationContext[] {

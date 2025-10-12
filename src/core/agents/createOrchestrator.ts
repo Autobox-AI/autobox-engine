@@ -4,11 +4,13 @@ import { createBaseAgent } from './createBaseAgent';
 import { createOrchestratorHandler } from './handlers';
 
 export const createOrchestrator = async ({
+  simulationId,
   agentIdsByName,
   config,
   messageBroker,
   onCompletion,
 }: {
+  simulationId: string;
   agentIdsByName: Record<string, string>;
   config: AgentConfig;
   messageBroker: MessageBroker;
@@ -17,6 +19,7 @@ export const createOrchestrator = async ({
   const id = agentIdsByName.orchestrator;
   const handler = createOrchestratorHandler({
     id,
+    simulationId,
     agentIdsByName,
     config,
     messageBroker,
