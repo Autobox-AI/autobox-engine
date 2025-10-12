@@ -19,7 +19,7 @@ export const startSimulation = async (): Promise<void> => {
   // const durationArg = args.find((arg: string) => arg.startsWith('--duration='));
   // const duration = 5; //durationArg ? parseInt(durationArg.split('=')[1]) : 5; // default 5 minutes
 
-  logger.info('🚀 Starting Autobox Engine with config path: ', configPath);
+  logger.info(`⚙️ Starting Autobox Engine with config path: ${configPath}`);
 
   // const config = readFileSync(`${configPath}/simulations/summer_vacation.json`, 'utf8');
   // const configJson = JSON.parse(config);

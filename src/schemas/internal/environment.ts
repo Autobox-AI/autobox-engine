@@ -18,6 +18,7 @@ export const EnvironmentSchema = z.object({
   JWT_SECRET: z.string().min(1),
   JWT_EXPIRES_IN: z.string().min(1),
   CONFIG_PATH: z.string().default('/autobox/config'),
+  LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;

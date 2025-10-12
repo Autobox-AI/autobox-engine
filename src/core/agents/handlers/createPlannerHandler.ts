@@ -51,7 +51,7 @@ export const createPlannerHandler = ({
 
     const history = memory.memoryToHistory({
       skipKeys: [],
-      agentNames: {
+      agentNamesById: {
         [job.data.fromAgentId]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
         [id]: SYSTEM_AGENT_IDS_BY_NAME.PLANNER,
       },

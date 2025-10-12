@@ -32,11 +32,13 @@ export const createOrchestratorHandler = ({
   let status: SimulationStatus = SIMULATION_STATUSES.NEW;
   const memory = createMemory();
   const sendMessage = createMessageSender({ config, messageBroker });
+  const agentNamesById = Object.fromEntries(
+    Object.entries(agentIdsByName).map(([name, id]) => [id, name])
+  );
 
   const handleMessage = async (job: Job<Message>): Promise<void> => {
-    status = SIMULATION_STATUSES.IN_PROGRESS;
-    logger.info(`[${config.name}] Status: ${status}`);
-    memory.add({ key: job.data.fromAgentId, value: job.data });
+    const fromAgentId = job.data.fromAgentId;
+    memory.add({ key: fromAgentId, value: job.data });
 
     if (job.data.type === MESSAGE_TYPES.INSTRUCTION) {
       dynamicInstruction = job.data.instruction;
@@ -44,17 +46,10 @@ export const createOrchestratorHandler = ({
       return;
     }
 
-    const fromAgentId = job.data.fromAgentId;
-
-    if (agentIdsByName.reporter === fromAgentId) {
+    if (agentIdsByName.reporter === fromAgentId && job.data.type === MESSAGE_TYPES.TEXT) {
       status = SIMULATION_STATUSES.COMPLETED;
-      logger.info(`[${config.name}] Signaling simulation completion based on status`);
-      onCompletion?.();
-      return;
-    }
-
-    if (fromAgentId === agentIdsByName.return && job.data.type === MESSAGE_TYPES.TEXT) {
       logger.info(`[${config.name}] Summary: ${job.data.content}`);
+      onCompletion?.();
       return;
     }
 
@@ -62,6 +57,7 @@ export const createOrchestratorHandler = ({
     let message: Message;
 
     if (job.data.type == MESSAGE_TYPES.SIGNAL && job.data.signal === SIGNALS.START) {
+      status = SIMULATION_STATUSES.IN_PROGRESS;
       toAgentId = agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.PLANNER];
       message = {
         fromAgentId: id,
@@ -79,9 +75,11 @@ export const createOrchestratorHandler = ({
       const plannerOutput = PlannerOutputSchema.parse(JSON.parse(job.data.content));
 
       status = plannerOutput.status;
+      logger.info(`[${config.name}] Status: ${status} (${plannerOutput.progress}%)`);
 
       if (plannerOutput.status === SIMULATION_STATUSES.COMPLETED) {
         logger.info(`[${config.name}] Planner completed. Sending history to reporter.`);
+        status = SIMULATION_STATUSES.SUMMARIZING;
         message = {
           fromAgentId: id,
           toAgentId: agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.REPORTER],
@@ -89,9 +87,9 @@ export const createOrchestratorHandler = ({
           content: JSON.stringify(
             memory.memoryToHistory({
               skipKeys: [],
-              agentNames: {
-                [job.data.fromAgentId]: job.data.fromAgentId,
-                [id]: config.name,
+              agentNamesById: {
+                [fromAgentId]: agentNamesById[fromAgentId],
+                [id]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
               },
             })
           ),
@@ -125,10 +123,11 @@ export const createOrchestratorHandler = ({
 
       const history = memory.memoryToHistory({
         skipKeys: [],
-        agentNames: {
-          [job.data.fromAgentId]: agentIdsByName[job.data.fromAgentId],
-          [id]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
-        },
+        agentNamesById: Object.fromEntries(
+          Object.entries(agentNamesById).filter(
+            ([, agentName]) => agentName !== SYSTEM_AGENT_IDS_BY_NAME.PLANNER
+          )
+        ),
       });
 
       message = {

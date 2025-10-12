@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { logger } from '../../config';
 import { MessageBroker } from '../../messaging';
 import { AgentNamesByAgentId, Config, WorkersInfo } from '../../schemas';
 import { createOrchestrator, createPlanner, createReporter, createWorker } from '../agents';
@@ -27,6 +28,8 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     reporter: randomUUID(),
     ...workerIds,
   };
+
+  logger.info(`[${config.simulation.name}] Agent IDs:`, agentIdsByName);
 
   const workersInfo: WorkersInfo = config.simulation.workers.map((workerConfig) => ({
     name: workerConfig.name,

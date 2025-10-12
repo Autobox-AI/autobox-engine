@@ -43,7 +43,7 @@ export const createWorkerHandler = ({
 
     const history = memory.memoryToHistory({
       skipKeys: [],
-      agentNames: {
+      agentNamesById: {
         [job.data.fromAgentId]: SYSTEM_AGENT_IDS_BY_NAME.ORCHESTRATOR,
         [id]: config.name,
       },

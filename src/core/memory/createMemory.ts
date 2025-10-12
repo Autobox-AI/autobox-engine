@@ -23,10 +23,10 @@ export const createMemory = () => {
 
   const memoryToHistory = ({
     skipKeys,
-    agentNames,
+    agentNamesById,
   }: {
     skipKeys: string[];
-    agentNames: Record<string, string>;
+    agentNamesById: Record<string, string>;
   }): HistoryMessage[] => {
     const history: HistoryMessage[] = [];
 
@@ -38,8 +38,10 @@ export const createMemory = () => {
       for (const message of messages) {
         if (!isTextMessage(message)) continue;
 
-        const senderName = agentNames[message.fromAgentId] ?? message.fromAgentId;
-        const receiverName = agentNames[message.toAgentId] ?? message.toAgentId;
+        const senderName = agentNamesById[message.fromAgentId];
+        const receiverName = agentNamesById[message.toAgentId];
+
+        if (!senderName || !receiverName) continue;
 
         const historyItem = {
           type: message.type,
