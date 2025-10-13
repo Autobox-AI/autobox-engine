@@ -1,7 +1,7 @@
 {
     "name": "Summer vacation",
     "max_steps": 150,
-    "timeout_seconds": 60,
+    "timeout_seconds": 600,
     "shutdown_grace_period_seconds": 5,
     "description": "This simulation is about a couple that needs to decide together a destiny for our summer vacation.",
     "task": "Ana and John need to decide together a destiny for our summer vacation. As soon as they agree, the simulation should end.",
