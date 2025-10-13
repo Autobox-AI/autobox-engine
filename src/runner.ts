@@ -11,28 +11,25 @@ program
   .version('0.0.1')
   .option('-c, --config <config>', 'simulation config file', '/autobox/config')
   .option('-d, --daemon', 'keep server alive after simulation completes', false)
+  .option('-s, --simulation-name <simulationName>', 'simulation name', 'summer_vacation')
   .parse(process.argv);
 
 export const startSimulation = async (): Promise<void> => {
   const options = program.opts();
   const configPath = options.config;
   const isDaemon = options.daemon;
-  // const args = process.argv.slice(2);
-  // const durationArg = args.find((arg: string) => arg.startsWith('--duration='));
-  // const duration = 5; //durationArg ? parseInt(durationArg.split('=')[1]) : 5; // default 5 minutes
+  const simulationName = options.simulationName;
 
-  logger.info(`⚙️ Starting Autobox Engine with config path: ${configPath}`);
+  logger.info(
+    `⚙️ Starting Autobox Engine with config path: ${configPath}/simulations/${simulationName}.json`
+  );
 
   if (isDaemon) {
     logger.info('🔄 Running in DAEMON mode - server will stay alive after simulation');
   }
 
-  // const config = readFileSync(`${configPath}/simulations/summer_vacation.json`, 'utf8');
-  // const configJson = JSON.parse(config);
-  // logger.info('🔍 Config: ', configJson);
-
   const config = loadConfig({
-    simulationName: 'summer_vacation',
+    simulationName: simulationName,
     configPath,
   });
 

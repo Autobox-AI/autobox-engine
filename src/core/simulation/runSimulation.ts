@@ -9,7 +9,7 @@ export const runSimulation = async (
   options: { daemon?: boolean } = {}
 ): Promise<void> => {
   const { daemon = false } = options;
-  logger.info(`🎬 Starting simulation`);
+  logger.info(`🎬 Starting simulation: ${config.simulation.name}`);
 
   let completeSimulation: (() => void) | null = null;
   const orchestratorCompletionPromise = new Promise<void>((resolve) => {

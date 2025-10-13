@@ -41,7 +41,7 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     ...Object.fromEntries(Object.entries(workerIds).map(([key, value]) => [value, key])),
   };
 
-  logger.info(`[${config.simulation.name}] Agent IDs:`, agentIdsByName);
+  logger.info('Agent IDs:', agentIdsByName);
 
   const workersInfo: WorkersInfo = config.simulation.workers.map((workerConfig) => ({
     name: workerConfig.name,
