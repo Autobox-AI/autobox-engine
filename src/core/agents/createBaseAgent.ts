@@ -39,17 +39,17 @@ export const createBaseAgent = ({
 
   const shutdown = async (): Promise<void> => {
     try {
-      // Close worker with 5 second timeout, then force close
-      await Promise.race([
-        worker.close(),
-        new Promise<void>((resolve) => {
-          setTimeout(async () => {
-            logger.warn(`[${config.name}] Worker close timeout, forcing shutdown`);
-            await worker.close(true); // Force close
-            resolve();
-          }, 5000);
-        }),
-      ]);
+      await worker.pause();
+
+      const closePromise = worker.close(true);
+      const timeoutPromise = new Promise<void>((resolve) => {
+        globalThis.setTimeout(() => {
+          logger.warn(`[${config.name}] Worker still closing after 2s, continuing...`);
+          resolve();
+        }, 2000);
+      });
+
+      await Promise.race([closePromise, timeoutPromise]);
       logger.info(`[${config.name}] Worker closed successfully`);
     } catch (error) {
       logger.error(`[${config.name}] Error closing worker:`, error);
