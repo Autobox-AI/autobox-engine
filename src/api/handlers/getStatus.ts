@@ -3,7 +3,7 @@ import { simulationRegistry } from '../../core';
 import { StatusResponse } from '../../schemas';
 
 export const getStatus = async (_req: Request, res: Response) => {
-  const context = simulationRegistry.getFirst();
+  const context = simulationRegistry.get();
 
   if (!context) {
     res.status(404).json({

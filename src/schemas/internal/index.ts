@@ -17,6 +17,7 @@ export {
   HistoryMessageSchema,
   HistorySignalMessageSchema,
   HistoryTextMessageSchema,
+  isAbortSignalMessage,
   isInstructionMessage,
   isSignalMessage,
   isTextMessage,

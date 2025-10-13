@@ -6,6 +6,7 @@ import {
   AgentIdsByName,
   AgentNamesById,
   HistoryMessage,
+  isAbortSignalMessage,
   isInstructionMessage,
   isSignalMessage,
   isTextMessage,
@@ -80,13 +81,24 @@ const createHistoryForAgent = (
   });
 };
 
-const transitionToStatus = (
-  ctx: OrchestratorContext,
-  newStatus: SimulationStatus,
-  progress: number
-): void => {
+const transitionToStatus = ({
+  ctx,
+  newStatus,
+  progress,
+}: {
+  ctx: OrchestratorContext;
+  newStatus: SimulationStatus;
+  progress?: number;
+}): void => {
   ctx.status.current = newStatus;
-  simulationRegistry.updateStatus(ctx.simulationId, newStatus, progress);
+  simulationRegistry.update({ status: newStatus, progress });
+};
+
+const handleAbortSignal = (ctx: OrchestratorContext): void => {
+  transitionToStatus({ ctx, newStatus: SIMULATION_STATUSES.ABORTED });
+  simulationRegistry.update({ summary: 'Simulation aborted by user' });
+  logger.info(`[${ctx.config.name}] Simulation aborted by user`);
+  ctx.onCompletion?.();
 };
 
 const handleInstructionMessage = (ctx: OrchestratorContext, message: Message): void => {
@@ -102,14 +114,14 @@ const handleReporterCompletion = (ctx: OrchestratorContext, message: Message): v
   const reporterAgentId = ctx.agentIdsByName.reporter;
   if (message.fromAgentId !== reporterAgentId) return;
 
-  transitionToStatus(ctx, SIMULATION_STATUSES.COMPLETED, 100);
-  simulationRegistry.updateSummary(ctx.simulationId, message.content);
+  transitionToStatus({ ctx, newStatus: SIMULATION_STATUSES.COMPLETED, progress: 100 });
+  simulationRegistry.update({ summary: message.content });
   logger.info(`[${ctx.config.name}] Summary: ${message.content}`);
   ctx.onCompletion?.();
 };
 
 const handleStartSignal = (ctx: OrchestratorContext): void => {
-  transitionToStatus(ctx, SIMULATION_STATUSES.IN_PROGRESS, 0);
+  transitionToStatus({ ctx, newStatus: SIMULATION_STATUSES.IN_PROGRESS });
 
   const plannerAgentId = ctx.agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.PLANNER];
   const startMessage: Message = {
@@ -124,7 +136,7 @@ const handleStartSignal = (ctx: OrchestratorContext): void => {
 
 const handlePlannerCompletion = (ctx: OrchestratorContext, fromAgentId: string): void => {
   logger.info(`[${ctx.config.name}] Planner completed. Sending history to reporter.`);
-  transitionToStatus(ctx, SIMULATION_STATUSES.SUMMARIZING, 99);
+  transitionToStatus({ ctx, newStatus: SIMULATION_STATUSES.SUMMARIZING, progress: 99 });
 
   const reporterAgentId = ctx.agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.REPORTER];
   const history = createHistoryForAgent(ctx, {
@@ -167,7 +179,7 @@ const handlePlannerResponse = async (ctx: OrchestratorContext, message: Message)
   if (!isTextMessage(message)) return;
 
   const plannerOutput = PlannerOutputSchema.parse(JSON.parse(message.content));
-  transitionToStatus(ctx, plannerOutput.status, plannerOutput.progress);
+  transitionToStatus({ ctx, newStatus: plannerOutput.status, progress: plannerOutput.progress });
 
   logger.info(`[${ctx.config.name}] Status: ${plannerOutput.status} (${plannerOutput.progress}%)`);
 
@@ -216,6 +228,11 @@ const routeMessage = async (ctx: OrchestratorContext, job: Job<Message>): Promis
   const fromAgentId = message.fromAgentId;
 
   ctx.memory.add({ key: fromAgentId, value: message });
+
+  if (isAbortSignalMessage(message) && message.signal === SIGNALS.ABORT) {
+    handleAbortSignal(ctx);
+    return;
+  }
 
   if (isInstructionMessage(message)) {
     handleInstructionMessage(ctx, message);

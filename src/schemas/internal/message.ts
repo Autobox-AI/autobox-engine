@@ -64,6 +64,10 @@ export const isSignalMessage = (message: Message): message is SignalMessage => {
   return message.type === MESSAGE_TYPES.SIGNAL;
 };
 
+export const isAbortSignalMessage = (message: Message): message is SignalMessage => {
+  return message.type === MESSAGE_TYPES.SIGNAL && message.signal === SIGNALS.ABORT;
+};
+
 export const isInstructionMessage = (message: Message): message is InstructionMessage => {
   return message.type === MESSAGE_TYPES.INSTRUCTION;
 };

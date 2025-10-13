@@ -12,4 +12,10 @@ export const apiSpec = new OpenApiGeneratorV3(openApiRegistry.definitions).gener
       email: 'support@autobox.io',
     },
   },
+  servers: [
+    {
+      url: 'http://localhost:4000',
+      description: 'Development server',
+    },
+  ],
 });

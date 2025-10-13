@@ -15,7 +15,6 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
   const simulationId = randomUUID();
 
   const handleCompletion = () => {
-    simulationRegistry.unregister(simulationId);
     onCompletion?.();
   };
 

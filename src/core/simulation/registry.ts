@@ -6,7 +6,7 @@ import { SimulationContext, SimulationStatus } from '../../schemas';
  */
 export class SimulationRegistry {
   private static instance: SimulationRegistry;
-  private simulations: Map<string, SimulationContext> = new Map();
+  private simulation: SimulationContext | undefined;
 
   private constructor() {}
 
@@ -18,62 +18,58 @@ export class SimulationRegistry {
   }
 
   register(context: SimulationContext): void {
-    this.simulations.set(context.simulationId, context);
+    this.simulation = context;
   }
 
-  unregister(simulationId: string): void {
-    this.simulations.delete(simulationId);
+  unregister(): void {
+    this.simulation = undefined;
   }
 
-  get(simulationId: string): SimulationContext | undefined {
-    return this.simulations.get(simulationId);
+  get(): SimulationContext | undefined {
+    return this.simulation;
   }
 
-  updateStatus(simulationId: string, status: SimulationStatus, progress: number): void {
-    const context = this.get(simulationId);
-    if (context) {
-      context.status = status;
-      context.progress = progress;
-      context.lastUpdated = new Date();
+  status(): SimulationStatus | undefined {
+    return this.simulation?.status;
+  }
+
+  getOrchestratorId(): string | undefined {
+    if (!this.simulation) {
+      return undefined;
     }
+    return this.simulation.agentIdsByName.orchestrator;
   }
 
-  updateSummary(simulationId: string, summary: string): void {
-    const context = this.get(simulationId);
-    if (context) {
-      context.summary = summary;
-      context.lastUpdated = new Date();
+  update({
+    status,
+    progress,
+    summary,
+  }: {
+    status?: SimulationStatus;
+    progress?: number;
+    summary?: string;
+  }): void {
+    if (this.simulation) {
+      this.simulation.status = status ?? this.simulation.status;
+      this.simulation.progress = progress ?? this.simulation.progress;
+      this.simulation.summary = summary ?? this.simulation.summary;
+      this.simulation.lastUpdated = new Date();
     }
   }
 
   getByAgentId(agentId: string): SimulationContext | undefined {
-    for (const context of this.simulations.values()) {
-      const agentIds = Object.values(context.agentIdsByName);
-      if (agentIds.includes(agentId)) {
-        return context;
-      }
+    if (!this.simulation) {
+      return undefined;
+    }
+    const agentIds = Object.values(this.simulation.agentIdsByName);
+    if (agentIds.includes(agentId)) {
+      return this.simulation;
     }
     return undefined;
   }
 
-  getFirst(): SimulationContext | undefined {
-    return this.simulations.values().next().value;
-  }
-
-  getAll(): SimulationContext[] {
-    return Array.from(this.simulations.values());
-  }
-
-  has(simulationId: string): boolean {
-    return this.simulations.has(simulationId);
-  }
-
   clear(): void {
-    this.simulations.clear();
-  }
-
-  size(): number {
-    return this.simulations.size;
+    this.simulation = undefined;
   }
 }
 

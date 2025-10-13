@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express, { Application } from 'express';
 import { exit } from 'process';
 import swaggerUi from 'swagger-ui-express';
@@ -12,6 +13,14 @@ import { apiSpec } from './swagger';
 
 const app: Application = express();
 const PORT = env.PORT;
+
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
