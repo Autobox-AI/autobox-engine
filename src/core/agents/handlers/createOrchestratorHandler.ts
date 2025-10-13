@@ -181,7 +181,14 @@ const handlePlannerResponse = async (ctx: OrchestratorContext, message: Message)
   const plannerOutput = PlannerOutputSchema.parse(JSON.parse(message.content));
   transitionToStatus({ ctx, newStatus: plannerOutput.status, progress: plannerOutput.progress });
 
-  logger.info(`[${ctx.config.name}] Status: ${plannerOutput.status} (${plannerOutput.progress}%)`);
+  const progress =
+    plannerOutput.status === SIMULATION_STATUSES.COMPLETED ? 99 : plannerOutput.progress;
+  const status =
+    plannerOutput.status === SIMULATION_STATUSES.COMPLETED
+      ? SIMULATION_STATUSES.SUMMARIZING
+      : plannerOutput.status;
+
+  logger.info(`[${ctx.config.name}] Status: ${status} (${progress}%)`);
 
   if (plannerOutput.status === SIMULATION_STATUSES.COMPLETED) {
     handlePlannerCompletion(ctx, message.fromAgentId);

@@ -46,6 +46,42 @@ export class MessageBroker {
   }
 
   async close(): Promise<void> {
-    await Promise.all(Object.values(this.queues).map((queue) => queue.close()));
+    try {
+      const closePromises = Object.values(this.queues).map((queue) => queue.close());
+      
+      // Close all queues with 5 second timeout, then force close
+      await Promise.race([
+        Promise.all(closePromises),
+        new Promise<void>((resolve) => {
+          setTimeout(async () => {
+            logger.warn('Queue close timeout, forcing shutdown');
+            // Force disconnect Redis connections
+            await Promise.all(
+              Object.values(this.queues).map(async (queue) => {
+                try {
+                  await queue.disconnect();
+                } catch (error) {
+                  logger.error('Error disconnecting queue:', error);
+                }
+              })
+            );
+            resolve();
+          }, 5000);
+        }),
+      ]);
+      logger.info('All queues closed successfully');
+    } catch (error) {
+      logger.error('Error closing message broker:', error);
+      // Force disconnect all queues on error
+      await Promise.all(
+        Object.values(this.queues).map(async (queue) => {
+          try {
+            await queue.disconnect();
+          } catch (err) {
+            logger.error('Error force disconnecting queue:', err);
+          }
+        })
+      );
+    }
   }
 }
