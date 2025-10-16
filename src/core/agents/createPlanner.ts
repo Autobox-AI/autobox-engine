@@ -16,15 +16,6 @@ export const createPlanner = ({
   messageBroker: MessageBroker;
   workersInfo: WorkersInfo;
 }) => {
-  // const memory = createMemory();
-  // const llm = createAiProcessor({
-  //   model: config.llm?.model,
-  //   systemPrompt: createWorkerPrompt({
-  //     task: task,
-  //     context: config.context,
-  //   }),
-  // });
-
   const handler = createPlannerHandler({
     id,
     task,

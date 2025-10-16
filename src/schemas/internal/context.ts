@@ -1,6 +1,7 @@
 import { MessageBroker } from '../../messaging';
 import { SimulationStatus } from '../common';
 import { AgentIdsByName, AgentNamesById } from './agents';
+import { Metric } from './metrics';
 
 export interface SimulationContext {
   simulationId: string;
@@ -12,6 +13,8 @@ export interface SimulationContext {
   progress: number;
 
   summary: string | null;
+
+  metrics: Record<string, Metric>;
   lastUpdated: Date;
   error: string | null;
 }

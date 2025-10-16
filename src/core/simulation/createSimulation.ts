@@ -5,10 +5,17 @@ import {
   AgentIdsByName,
   AgentNamesById,
   Config,
+  Metric,
   SIMULATION_STATUSES,
   WorkersInfo,
 } from '../../schemas';
-import { createOrchestrator, createPlanner, createReporter, createWorker } from '../agents';
+import {
+  createEvaluator,
+  createOrchestrator,
+  createPlanner,
+  createReporter,
+  createWorker,
+} from '../agents';
 import { simulationRegistry } from './registry';
 
 export const createSimulation = async (config: Config, onCompletion?: () => void) => {
@@ -49,13 +56,6 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     instruction: workerConfig.instruction,
     context: workerConfig.context,
   }));
-  // const agentNames = {
-  //   [agentIds.orchestrator]: 'orchestrator',
-  //   [agentIds.planner]: 'planner',
-  //   [agentIds.reporter]: 'reporter',
-  //   [agentIds.evaluator]: 'evaluator',
-  //   ...Object.fromEntries(Object.entries(agentIds).map(([key, value]) => [value, key])),
-  // };
 
   const messageBroker = new MessageBroker(agentIdsByName);
 
@@ -68,6 +68,21 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     status: SIMULATION_STATUSES.NEW,
     progress: 0,
     summary: null,
+    metrics: config.metrics.reduce<Record<string, Metric>>(
+      (acc, metric) => ({
+        ...acc,
+        [metric.name]: {
+          name: metric.name,
+          description: metric.description,
+          type: metric.type,
+          unit: metric.unit,
+          tags: metric.tags,
+          values: [],
+          lastUpdated: new Date().toISOString(),
+        },
+      }),
+      {}
+    ),
     lastUpdated: new Date(),
     error: null,
   });
@@ -80,49 +95,15 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
       messageBroker,
     })
   );
-  // const planner = await preparePlanner({
-  //   request,
-  //   orchestratorId: workerIds.orchestrator,
-  //   messageBroker,
-  //   plannerId: workerIds.planner,
-  //   instruction: request.planner.instruction,
-  //   workerIds,
-  //   simulationId,
-  //   runId,
-  //   simulationName: request.name,
-  // });
-  // const reporter = await prepareReporter({
-  //   request,
-  //   orchestratorId: workerIds.orchestrator,
-  //   messageBroker,
-  //   reporterId: workerIds.reporter,
-  //   instruction: request.reporter.instruction,
-  //   simulationId,
-  //   runId,
-  //   simulationName: request.name,
-  // });
-  // const evaluator = await prepareEvaluator({
-  //   request,
-  //   metrics,
-  //   orchestratorId: workerIds.orchestrator,
-  //   messageBroker,
-  //   evaluatorId: workerIds.evaluator,
-  //   instruction: request.evaluator.instruction,
-  //   simulationId,
-  //   runId,
-  //   simulationName: request.name,
-  // });
-  // const orchestrator = await createOrchestrator({
-  //   request,
-  //   metrics,
-  //   workerIds,
-  //   messageBroker,
-  //   workerNames,
-  //   simulationId,
-  //   runId,
-  //   simulationName: request.name,
-  //   instruction: request.orchestrator.instruction,
-  // });
+
+  const evaluator = await createEvaluator({
+    id: agentIdsByName.evaluator,
+    task: config.simulation.task,
+    config: config.simulation.evaluator,
+    metricsConfig: config.metrics,
+    messageBroker,
+    workersInfo,
+  });
 
   const planner = await createPlanner({
     config: config.simulation.planner,
@@ -148,21 +129,5 @@ export const createSimulation = async (config: Config, onCompletion?: () => void
     onCompletion: handleCompletion,
   });
 
-  // const run = new Run({
-  //   id: runId,
-  //   simulationId,
-  //   name: request.name,
-  //   description: request.description,
-  //   status: RUN_STATUSES.IN_PROGRESS,
-  //   startedAt: new Date().toISOString(),
-  //   progress: 0,
-  //   workers,
-  //   orchestrator,
-  //   planner,
-  //   reporter,
-  //   evaluator,
-  //   task: request.task,
-  // });
-
-  return { simulationId, orchestrator, workers, planner, reporter };
+  return { simulationId, orchestrator, workers, planner, reporter, evaluator };
 };

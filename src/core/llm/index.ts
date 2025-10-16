@@ -3,6 +3,7 @@ export {
   createPrompt as createEvaluatorPrompt,
   EvaluatorOutputSchema,
   type EvaluatorOutput,
+  type MetricUpdate,
 } from './prompts/evaluator/v0.0.1';
 export {
   createPrompt as createMetricsPrompt,

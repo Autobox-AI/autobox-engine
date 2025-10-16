@@ -33,7 +33,13 @@ export {
   type SignalMessage,
   type TextMessage,
 } from './message';
-export { MetricsConfigSchema, type MetricsConfig } from './metricsConfig';
+export { MetricSchema, type Metric } from './metrics';
+export {
+  MetricsConfigSchema,
+  MetricTypeSchema,
+  type MetricConfig,
+  type MetricsConfig,
+} from './metricsConfig';
 export {
   LoggingConfigSchema,
   ServerConfigSchema,

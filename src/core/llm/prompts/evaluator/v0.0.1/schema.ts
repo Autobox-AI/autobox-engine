@@ -73,13 +73,10 @@ export type Tag = z.infer<typeof TagSchema>;
 
 export const MetricUpdateSchema = z.object({
   name: z.string().describe('The name of the metric.'),
-  data: MetricValueSchema.describe(
+  dt: z.string().describe('Datetime of the metric value in ISO 8601 format'),
+  value: MetricValueSchema.describe(
     'The data values of the metric based on the type of the metric.'
   ),
-  unit: z
-    .string()
-    .optional()
-    .describe('The unit of the metric. Example: "tasks", "seconds", "requests", "bytes", etc.'),
   tags: z.array(TagSchema).default([]),
 });
 
@@ -89,7 +86,7 @@ export const EvaluatorOutputSchema = z.object({
   thinkingProcess: z
     .string()
     .describe('Think step by step and explain your decision process. <= 30 words.'),
-  metrics_updates: z
+  metricsUpdates: z
     .array(MetricUpdateSchema)
     .describe('A list of metric updates. Empty array if there are no updates.'),
 });

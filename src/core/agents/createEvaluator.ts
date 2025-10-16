@@ -1,24 +1,30 @@
 import { MessageBroker } from '../../messaging';
-import { AgentConfig } from '../../schemas';
+import { AgentConfig, MetricsConfig, WorkersInfo } from '../../schemas';
 import { createBaseAgent } from './createBaseAgent';
-import { createWorkerHandler } from './handlers';
+import { createEvaluatorHandler } from './handlers';
 
-export const createWorker = ({
+export const createEvaluator = ({
   id,
   task,
   config,
+  metricsConfig,
   messageBroker,
+  workersInfo,
 }: {
   id: string;
   task: string;
   config: AgentConfig;
+  metricsConfig: MetricsConfig;
   messageBroker: MessageBroker;
+  workersInfo: WorkersInfo;
 }) => {
-  const handler = createWorkerHandler({
+  const handler = createEvaluatorHandler({
     id,
     task,
     config,
+    metricsConfig,
     messageBroker,
+    workersInfo,
   });
 
   const { shutdown: baseShutdown } = createBaseAgent({

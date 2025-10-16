@@ -1,4 +1,5 @@
-import { SimulationContext, SimulationStatus } from '../../schemas';
+import { Metric, SimulationContext, SimulationStatus } from '../../schemas';
+import { MetricUpdate } from '../llm';
 
 /**
  * Singleton registry to track active simulations and their message brokers.
@@ -33,6 +34,14 @@ export class SimulationRegistry {
     return this.simulation?.status;
   }
 
+  progress(): number {
+    return this.simulation?.progress ?? 0;
+  }
+
+  metrics(): Record<string, Metric> | undefined {
+    return this.simulation?.metrics;
+  }
+
   getOrchestratorId(): string | undefined {
     if (!this.simulation) {
       return undefined;
@@ -55,6 +64,56 @@ export class SimulationRegistry {
       this.simulation.summary = summary ?? this.simulation.summary;
       this.simulation.lastUpdated = new Date();
     }
+  }
+
+  updateMetrics(metrics: MetricUpdate[]): void {
+    if (!this.simulation) {
+      return;
+    }
+
+    metrics.forEach((metricUpdate) => {
+      const existingMetric = this.simulation!.metrics[metricUpdate.name];
+      if (existingMetric) {
+        let transformedValue;
+
+        switch (metricUpdate.value.type) {
+          case 'COUNTER':
+            transformedValue = { value: metricUpdate.value.value };
+            break;
+          case 'GAUGE':
+            transformedValue = { value: metricUpdate.value.value };
+            break;
+          case 'HISTOGRAM':
+            transformedValue = {
+              count: metricUpdate.value.count,
+              sum: metricUpdate.value.sum,
+              buckets: metricUpdate.value.buckets,
+            };
+            break;
+          case 'SUMMARY':
+            transformedValue = {
+              count: metricUpdate.value.count,
+              sum: metricUpdate.value.sum,
+              quantiles: metricUpdate.value.quantiles.map((q) => ({
+                quantile: q.quantile,
+                value: q.value ?? 0,
+              })),
+            };
+            break;
+        }
+
+        const metricValue = {
+          dt: metricUpdate.dt,
+          value: transformedValue,
+          tags: metricUpdate.tags,
+        };
+
+        existingMetric.values.push(metricValue);
+        existingMetric.lastUpdated = new Date().toISOString();
+      }
+    });
+
+    this.simulation.lastUpdated = new Date();
   }
 
   getByAgentId(agentId: string): SimulationContext | undefined {

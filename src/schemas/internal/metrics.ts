@@ -1,14 +1,8 @@
-import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { MetricTypeSchema } from '../internal';
-
-extendZodWithOpenApi(z);
+import { MetricTypeSchema } from './metricsConfig';
 
 export const TagDefinitionSchema = z.object({
-  tag: z.string().openapi({
-    description: 'The tag of the metric',
-    example: 'agent_name',
-  }),
+  tag: z.string(),
   description: z.string(),
 });
 
@@ -53,29 +47,14 @@ export const MetricValueSchema = z.object({
   tags: z.array(TagValueSchema),
 });
 
-export const MetricResponseSchema = z.object({
+export const MetricSchema = z.object({
   name: z.string(),
   description: z.string(),
-  type: MetricTypeSchema.openapi({
-    description: 'The type of the metric',
-    example: 'COUNTER',
-  }),
-  unit: z.string().openapi({
-    description: 'The unit of the metric',
-    example: 'interactions',
-  }),
+  type: MetricTypeSchema,
+  unit: z.string(),
   tags: z.array(TagDefinitionSchema),
   values: z.array(MetricValueSchema),
-  last_updated: z.string().openapi({
-    description: 'Datetime of the metric value in ISO 8601 format',
-    example: '2021-01-01T00:00:00.000Z',
-  }),
+  lastUpdated: z.string().describe('Datetime of the metric value in ISO 8601 format'),
 });
 
-export type MetricResponse = z.infer<typeof MetricResponseSchema>;
-
-export const MetricsResponseSchema = z.object({
-  metrics: z.array(MetricResponseSchema),
-});
-
-export type MetricsResponse = z.infer<typeof MetricsResponseSchema>;
+export type Metric = z.infer<typeof MetricSchema>;

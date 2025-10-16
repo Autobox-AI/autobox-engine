@@ -1,9 +1,9 @@
 import z from 'zod';
-import { AgentsInfoSchema } from '../../../../../schemas';
+import { WorkersInfoSchema } from '../../../../../schemas';
 
 export const PlannerPromptParamsSchema = z.object({
   task: z.string(),
-  agentsInfo: AgentsInfoSchema,
+  agentsInfo: WorkersInfoSchema,
   context: z.string().optional(),
 });
 

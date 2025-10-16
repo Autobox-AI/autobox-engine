@@ -17,7 +17,7 @@ import {
   SimulationStatus,
   SYSTEM_AGENT_IDS_BY_NAME,
 } from '../../../schemas';
-import { PlannerOutputSchema } from '../../llm';
+import { EvaluatorOutputSchema, PlannerOutputSchema } from '../../llm';
 import { createMemory, Memory } from '../../memory';
 import { simulationRegistry } from '../../simulation';
 import { createMessageSender } from '../utils';
@@ -198,6 +198,12 @@ const handlePlannerResponse = async (ctx: OrchestratorContext, message: Message)
   await handlePlannerInstructions(ctx, plannerOutput.instructions);
 };
 
+const handleEvaluatorResponse = (message: Message): void => {
+  if (!isTextMessage(message)) return;
+  const evaluatorOutput = EvaluatorOutputSchema.parse(JSON.parse(message.content));
+  simulationRegistry.updateMetrics(evaluatorOutput.metricsUpdates);
+};
+
 const handleAgentResponse = ({
   ctx,
   message,
@@ -217,7 +223,7 @@ const handleAgentResponse = ({
 
   const plannerAgentId = ctx.agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.PLANNER];
   const history = createHistoryForAgent(ctx, {
-    excludeAgentNames: [SYSTEM_AGENT_IDS_BY_NAME.PLANNER],
+    excludeAgentNames: [SYSTEM_AGENT_IDS_BY_NAME.PLANNER, SYSTEM_AGENT_IDS_BY_NAME.EVALUATOR],
   });
 
   const plannerMessage: Message = {
@@ -251,6 +257,11 @@ const routeMessage = async (ctx: OrchestratorContext, job: Job<Message>): Promis
     return;
   }
 
+  if (fromAgentId === ctx.agentIdsByName.evaluator) {
+    handleEvaluatorResponse(message);
+    return;
+  }
+
   if (isSignalMessage(message) && message.signal === SIGNALS.START) {
     handleStartSignal(ctx);
     return;
@@ -263,6 +274,24 @@ const routeMessage = async (ctx: OrchestratorContext, job: Job<Message>): Promis
   }
 
   handleAgentResponse({ ctx, message });
+
+  if (simulationRegistry.progress() > 1) {
+    evaluate(ctx);
+  }
+};
+
+const evaluate = (ctx: OrchestratorContext): void => {
+  const evaluatorAgentId = ctx.agentIdsByName[SYSTEM_AGENT_IDS_BY_NAME.EVALUATOR];
+  const conversationHistory = createHistoryForAgent(ctx, {
+    excludeAgentNames: [SYSTEM_AGENT_IDS_BY_NAME.EVALUATOR, SYSTEM_AGENT_IDS_BY_NAME.PLANNER],
+  });
+  const evaluatorMessage: Message = {
+    fromAgentId: ctx.id,
+    toAgentId: evaluatorAgentId,
+    type: MESSAGE_TYPES.TEXT,
+    content: JSON.stringify(conversationHistory),
+  };
+  sendMessageWithMemory(ctx, evaluatorMessage);
 };
 
 export const createOrchestratorHandler = ({

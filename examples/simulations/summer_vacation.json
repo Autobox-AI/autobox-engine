@@ -11,7 +11,7 @@
             "max_size": 400
         },
         "llm": {
-            "model": "gpt-5-nano"
+            "model": "gpt-4o-mini"
         }
     },
     "reporter": {
@@ -47,7 +47,7 @@
             "description": "this is ana agent",
             "context": "Role: Ana is John's wife. Backstory: She is 35 years old and works at Google as a Business Controller. She is passionate about reading and books. She likes food and she started a blog about books and reading. She loves Taylor Swift and she is a Swiftie. She loves montains and beaches. Be flexible. Ana is the most traveller in the couple, she has experience enough to always create amazing trips. Mainly because she has dedicated part of her life to write about countries. Ana is dominant in the couple. Also she has more influence in decisions. You have full availability for vacation, no constraints",
             "llm": {
-                "model": "gpt-5-nano"
+                "model": "gpt-4o-mini"
             },
             "mailbox": {
                 "max_size": 100
@@ -58,7 +58,7 @@
             "description": "this is john agent",
             "context": "Role: John is Ana's husband. Backstory: He is 30 years old and works at Apple as a Software Engineer. He is passionate about technology and innovation. He loves to travel and explore new places. He is a big fan of Premier League. Both Ana and John are from London and they live in New York now. Both like Harry Potter books. John attended a Taylor Swift concert with Ana a month ago and he liked it. John likes beaches and montains. Be flexible. You have full availability for vacation, no constraints",
             "llm": {
-                "model": "gpt-5-nano"
+                "model": "gpt-4o-mini"
             },
             "mailbox": {
                 "max_size": 100

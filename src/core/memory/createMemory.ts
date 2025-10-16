@@ -14,7 +14,11 @@ export const createMemory = () => {
     let count = 0;
     for (const [key, messages] of Object.entries(memory)) {
       if (lastAgentId === key) continue;
-      if (messages.length > 0 && messages[messages.length - 1].fromAgentId === lastAgentId) {
+      if (
+        messages.length > 0 &&
+        'fromAgentId' in messages[messages.length - 1] &&
+        messages[messages.length - 1].fromAgentId === lastAgentId
+      ) {
         count++;
       }
     }
