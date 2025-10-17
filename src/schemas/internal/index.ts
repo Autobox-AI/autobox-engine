@@ -14,9 +14,11 @@ export { type SimulationContext } from './context';
 export { EnvironmentSchema, type Environment } from './environment';
 export {
   BaseMessageSchema,
+  HistoryInstructionMessageSchema,
   HistoryMessageSchema,
   HistorySignalMessageSchema,
   HistoryTextMessageSchema,
+  InstructionMessageSchema,
   isAbortSignalMessage,
   isInstructionMessage,
   isSignalMessage,
@@ -26,9 +28,11 @@ export {
   SIGNALS,
   TextMessageSchema,
   type BaseMessage,
+  type HistoryInstructionMessage,
   type HistoryMessage,
   type HistorySignalMessage,
   type HistoryTextMessage,
+  type InstructionMessage,
   type Message,
   type SignalMessage,
   type TextMessage,

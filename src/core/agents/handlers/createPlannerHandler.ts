@@ -33,7 +33,7 @@ export const createPlannerHandler = ({
     schema: PlannerOutputSchema,
     systemPrompt: createPlannerPrompt({
       task: task,
-      workersInfo,
+      agentsInfo: workersInfo,
       context: config.context,
     }),
   });
