@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import {
   HealthResponseSchema,
+  InfoResponseSchema,
   InstructionRequestSchema,
   MetricsResponseSchema,
   StatusResponseSchema,
@@ -135,12 +136,31 @@ const getStatusV1 = {
   },
 };
 
+const getInfoV1 = {
+  method: 'get' as const,
+  path: '/v1/info',
+  summary: 'Get info of a simulation',
+  description: 'Get info of a simulation',
+  tags: ['simulations'],
+  responses: {
+    200: {
+      description: 'Ok',
+      content: {
+        'application/json': {
+          schema: InfoResponseSchema,
+        },
+      },
+    },
+  },
+};
+
 openApiRegistry.registerPath(ping);
 openApiRegistry.registerPath(health);
 openApiRegistry.registerPath(getMetricsV1);
 openApiRegistry.registerPath(postInstructionV1);
 openApiRegistry.registerPath(postAbortV1);
 openApiRegistry.registerPath(getStatusV1);
+openApiRegistry.registerPath(getInfoV1);
 
 // export const tracesResponse = openApiRegistry.register('TracesResponse', TracesResponseSchema);
 

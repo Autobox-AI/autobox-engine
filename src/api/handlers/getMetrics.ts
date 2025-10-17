@@ -4,6 +4,7 @@ import { MetricsResponse } from '../../schemas';
 
 export const getMetrics = async (_req: Request, res: Response) => {
   const metrics = simulationRegistry.metrics();
+
   if (!metrics) {
     res.status(404).json({
       error: 'Metrics not found',

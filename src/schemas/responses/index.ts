@@ -1,4 +1,5 @@
 export { HealthResponseSchema, type HealthResponse } from './HealthResponse';
+export { InfoResponseSchema, type InfoResponse } from './InfoResponse';
 export {
   MetricResponseSchema,
   MetricsResponseSchema,
