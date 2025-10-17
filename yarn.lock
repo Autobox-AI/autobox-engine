@@ -1935,6 +1935,7 @@ __metadata:
     ioredis-timeout: "npm:^1.5.0"
     jest: "npm:^29.7.0"
     jest-junit: "npm:^16.0.0"
+    jest-util: "npm:^29.7.0"
     jsonwebtoken: "npm:^9.0.2"
     junit-merge: "npm:^2.0.0"
     nodemon: "npm:^3.1.10"
