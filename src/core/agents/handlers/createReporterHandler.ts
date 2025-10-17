@@ -55,10 +55,10 @@ export const createReporterHandler = ({
       },
     ];
 
-    const summary = await think({
+    const summary = (await think({
       name: config.name,
       messages: chatCompletionMessages,
-    });
+    })) as string;
 
     if (!summary) {
       logger.error(`[${config.name}] Error summarizing`);

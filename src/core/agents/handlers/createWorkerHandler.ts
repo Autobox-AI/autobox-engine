@@ -62,7 +62,7 @@ export const createWorkerHandler = ({
       },
     ];
 
-    const llmOutput = await think({ name: config.name, messages: chatCompletionMessages });
+    const llmOutput = (await think({ name: config.name, messages: chatCompletionMessages })) as string;
 
     if (!llmOutput) {
       logger.error(`[${config.name}] Error thinking:`);

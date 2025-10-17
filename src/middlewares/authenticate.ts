@@ -2,16 +2,6 @@ import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env, logger } from '../config';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    user?: {
-      userId: string;
-      username: string;
-      role: string;
-    };
-  }
-}
-
 export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;

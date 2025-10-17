@@ -24,7 +24,7 @@ export const createAiProcessor = ({
   }: {
     name: string;
     messages: ChatCompletionMessageParam[];
-  }): Promise<z.infer<typeof schema> | string | null> => {
+  }): Promise<unknown> => {
     logger.info(`[${name}] thinking...`);
 
     const completionMessages = [

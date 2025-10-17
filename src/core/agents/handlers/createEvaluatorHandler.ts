@@ -71,10 +71,10 @@ export const createEvaluatorHandler = ({
       },
     ];
 
-    const evaluatorOutput: EvaluatorOutput = await think({
+    const evaluatorOutput = (await think({
       name: config.name,
       messages: chatCompletionMessages,
-    });
+    })) as EvaluatorOutput;
 
     if (!evaluatorOutput) {
       logger.error(`[${config.name}] Error evaluating:`);

@@ -74,10 +74,10 @@ export const createPlannerHandler = ({
       },
     ];
 
-    const plannerOutput: PlannerOutput = await think({
+    const plannerOutput = (await think({
       name: config.name,
       messages: chatCompletionMessages,
-    });
+    })) as PlannerOutput;
 
     if (!plannerOutput) {
       logger.error(`[${config.name}] Error planning:`);
