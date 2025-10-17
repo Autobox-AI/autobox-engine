@@ -14,7 +14,7 @@ export const createAiProcessor = ({
 }: {
   systemPrompt: string;
   model?: string;
-  schema?: z.ZodTypeAny;
+  schema?: z.ZodType<any>;
 }) => {
   const openai: OpenAI = new OpenAI();
 
@@ -38,9 +38,11 @@ export const createAiProcessor = ({
     };
 
     if (schema) {
+      // @ts-expect-error - zodResponseFormat causes deep type instantiation with complex schemas
+      const responseFormat = zodResponseFormat(schema, 'output');
       completionParams = {
         ...completionParams,
-        response_format: zodResponseFormat(schema, 'output'),
+        response_format: responseFormat,
       };
     }
 

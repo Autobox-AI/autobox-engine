@@ -23,8 +23,8 @@
     "simulation",
     "typescript"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "margostino",
+  "license": "Apache-2.0",
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",
     "@types/jsonwebtoken": "^9.0.10",
