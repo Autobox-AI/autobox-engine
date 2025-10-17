@@ -1,7 +1,7 @@
 import { z, ZodError, ZodType } from 'zod';
 import { logger } from '../config';
 
-export const zodParse = <Schema extends ZodType<any>>(
+export const zodParse = <Schema extends ZodType>(
   schema: Schema,
   input: unknown
 ): z.infer<Schema> => {

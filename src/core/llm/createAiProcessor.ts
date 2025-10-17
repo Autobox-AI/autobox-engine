@@ -24,7 +24,7 @@ export const createAiProcessor = ({
   }: {
     name: string;
     messages: ChatCompletionMessageParam[];
-  }): Promise<any> => {
+  }): Promise<z.infer<typeof schema> | string | null> => {
     logger.info(`[${name}] thinking...`);
 
     const completionMessages = [
@@ -40,7 +40,7 @@ export const createAiProcessor = ({
     if (schema) {
       completionParams = {
         ...completionParams,
-        response_format: zodResponseFormat(schema as any, 'output'),
+        response_format: zodResponseFormat(schema, 'output'),
       };
     }
 

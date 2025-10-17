@@ -1,4 +1,4 @@
-# Autobox Engine (TypeScript)
+# Autobox Engine
 
 > Multi-agent AI simulation runtime engine powered by TypeScript, BullMQ, and OpenAI
 
@@ -133,23 +133,27 @@ The API server will be available at `http://localhost:3000` with Swagger documen
 The project includes four example simulations in `examples/simulations/`:
 
 ### 1. Summer Vacation Planning
+
 **File**: `summer_vacation.json`
 **Scenario**: A couple (ANA and JOHN) decides on a vacation destination
 **Agents**: 2 workers
 **Use Case**: Decision-making, negotiation, relationship dynamics
 
 ### 2. Crime Detective
+
 **File**: `crime_detective.json`
 **Scenario**: Detective solves a murder at a high-society gala
 **Agents**: DETECTIVE, SINGER, DRIVER, BANKER
 **Use Case**: Mystery solving, interrogation, deduction
 
 ### 3. Gift Choice
+
 **File**: `gift_choice.json`
 **Scenario**: Selecting the perfect gift
 **Use Case**: Preference elicitation, recommendation
 
 ### 4. Nordic Team Planning
+
 **File**: `nordic_team.json`
 **Scenario**: Software development project planning
 **Agents**: Team with Nordic names
@@ -199,17 +203,20 @@ yarn test
 ## API Endpoints
 
 ### Health & Information
+
 - `GET /health` - Health check
 - `GET /ping` - Simple ping endpoint
 - `GET /v1/info` - Get agent information (names and IDs)
 
 ### Simulation Control
+
 - `GET /v1/status` - Get current simulation status
 - `GET /v1/metrics` - Get simulation metrics
 - `POST /v1/instructions/agents/:agent_id` - Send instruction to specific agent
 - `POST /v1/abort` - Abort running simulation
 
 ### Documentation
+
 - `GET /` - OpenAPI specification (JSON)
 - `GET /docs` - Interactive Swagger UI
 
@@ -430,6 +437,7 @@ ISC License - see LICENSE file for details
 ## Support
 
 For questions and support:
+
 - Open an issue on GitHub
 - Check the [CLAUDE.md](CLAUDE.md) file for detailed development guidance
 
