@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+
+# Clean up Docker images and containers for autobox-engine
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default values
+FORCE=false
+ALL=false
+PRUNE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force|-f)
+            FORCE=true
+            shift
+            ;;
+        --all|-a)
+            ALL=true
+            shift
+            ;;
+        --prune|-p)
+            PRUNE=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Clean up Docker images and containers for autobox-engine"
+            echo ""
+            echo "Options:"
+            echo "  -f, --force   Don't ask for confirmation"
+            echo "  -a, --all     Remove all autobox-engine images (including dev)"
+            echo "  -p, --prune   Also prune unused Docker resources"
+            echo "  -h, --help    Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0              # Remove autobox-engine:latest with confirmation"
+            echo "  $0 -f           # Remove without confirmation"
+            echo "  $0 -a -f        # Remove all autobox-engine images without confirmation"
+            echo "  $0 -p           # Remove images and prune unused resources"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+# Function to remove containers using an image
+remove_containers() {
+    local image=$1
+    local containers=$(docker ps -a -q --filter ancestor="$image" 2>/dev/null)
+    
+    if [ -n "$containers" ]; then
+        echo -e "${YELLOW}Stopping and removing containers using $image...${NC}"
+        docker stop $containers 2>/dev/null || true
+        docker rm $containers 2>/dev/null || true
+        echo -e "${GREEN}✓ Containers removed${NC}"
+    fi
+}
+
+# Function to remove an image
+remove_image() {
+    local image=$1
+    
+    if docker images | grep -q "$image"; then
+        remove_containers "$image"
+        echo -e "${YELLOW}Removing image: $image${NC}"
+        docker rmi "$image" 2>/dev/null || docker rmi -f "$image"
+        echo -e "${GREEN}✓ Image removed: $image${NC}"
+    else
+        echo -e "${BLUE}Image not found: $image${NC}"
+    fi
+}
+
+# Determine which images to remove
+if [ "$ALL" = true ]; then
+    IMAGES=("autobox-engine:latest" "autobox-engine:dev" "autobox-engine:dev-latest")
+    echo -e "${YELLOW}Preparing to remove ALL autobox-engine images${NC}"
+else
+    IMAGES=("autobox-engine:latest")
+    echo -e "${YELLOW}Preparing to remove autobox-engine:latest${NC}"
+fi
+
+# Show what will be removed
+echo -e "\n${BLUE}Images to be removed:${NC}"
+for image in "${IMAGES[@]}"; do
+    if docker images | grep -q "$image"; then
+        echo "  - $image"
+    fi
+done
+
+# Ask for confirmation unless --force is used
+if [ "$FORCE" != true ]; then
+    echo -e "\n${YELLOW}This will remove the above images and any containers using them.${NC}"
+    read -p "Are you sure? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}Cancelled${NC}"
+        exit 0
+    fi
+fi
+
+echo ""
+
+# Stop any running docker-compose services
+if [ -f "docker-compose.yml" ]; then
+    echo -e "${YELLOW}Stopping docker-compose services...${NC}"
+    docker-compose down 2>/dev/null || true
+fi
+
+# Remove the images
+for image in "${IMAGES[@]}"; do
+    remove_image "$image"
+done
+
+# Prune if requested
+if [ "$PRUNE" = true ]; then
+    echo -e "\n${YELLOW}Pruning unused Docker resources...${NC}"
+    docker system prune -f
+    echo -e "${GREEN}✓ Pruned unused resources${NC}"
+fi
+
+# Show remaining autobox images
+echo -e "\n${BLUE}Remaining autobox-engine images:${NC}"
+docker images | grep autobox-engine || echo "  None"
+
+echo -e "\n${GREEN}✓ Cleanup complete${NC}"

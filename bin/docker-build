@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+# Build script for Docker images
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Default values
+TAG="latest"
+PUSH=false
+# Default to native architecture
+PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/')"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --tag|-t)
+            TAG="$2"
+            shift 2
+            ;;
+        --push|-p)
+            PUSH=true
+            shift
+            ;;
+        --platform)
+            PLATFORM="$2"
+            shift 2
+            ;;
+        --dev|-d)
+            DEV=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  -t, --tag TAG       Docker image tag (default: latest)"
+            echo "  -p, --push          Push image to registry after build"
+            echo "  --platform PLATFORM Build for specific platform (default: linux/amd64)"
+            echo "  -d, --dev           Build development image"
+            echo "  -h, --help          Show this help message"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+# Image name
+IMAGE_NAME="autobox-engine"
+
+if [ "$DEV" = true ]; then
+    DOCKERFILE="Dockerfile.dev"
+    FULL_IMAGE_NAME="${IMAGE_NAME}:dev-${TAG}"
+    echo -e "${YELLOW}Building development image...${NC}"
+else
+    DOCKERFILE="Dockerfile"
+    FULL_IMAGE_NAME="${IMAGE_NAME}:${TAG}"
+    echo -e "${YELLOW}Building production image...${NC}"
+fi
+
+echo -e "Image: ${GREEN}${FULL_IMAGE_NAME}${NC}"
+echo -e "Platform: ${GREEN}${PLATFORM}${NC}"
+
+# Build the image
+docker build \
+    --platform "${PLATFORM}" \
+    -f "${DOCKERFILE}" \
+    -t "${FULL_IMAGE_NAME}" \
+    .
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓ Image built successfully: ${FULL_IMAGE_NAME}${NC}"
+    
+    # Show image size
+    SIZE=$(docker images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}" | grep "${FULL_IMAGE_NAME}" | awk '{print $2}')
+    echo -e "Image size: ${GREEN}${SIZE}${NC}"
+    
+    if [ "$PUSH" = true ]; then
+        echo -e "${YELLOW}Pushing image to registry...${NC}"
+        docker push "${FULL_IMAGE_NAME}"
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✓ Image pushed successfully${NC}"
+        else
+            echo -e "${RED}✗ Failed to push image${NC}"
+            exit 1
+        fi
+    fi
+else
+    echo -e "${RED}✗ Failed to build image${NC}"
+    exit 1
+fi

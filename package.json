@@ -16,14 +16,21 @@
     "test:ci": "jest --ci --coverage --maxWorkers=2",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint 'src/**/*.ts' --fix",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "docker:build": "./bin/docker-build",
+    "docker:build:dev": "./bin/docker-build --dev",
+    "docker:run": "./bin/docker-run",
+    "docker:run:dev": "./bin/docker-run-dev",
+    "docker:run:exit": "./bin/docker-run-and-exit",
+    "docker:clean": "./bin/docker-clean",
+    "docker:clean:all": "./bin/docker-clean --all --force"
   },
   "keywords": [
     "autobox",
     "simulation",
     "typescript"
   ],
-  "author": "margostino",
+  "author": "margostino <maj.dagostino@gmail.com>",
   "license": "Apache-2.0",
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",

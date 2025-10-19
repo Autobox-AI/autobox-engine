@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+# Run Docker development container
+set -e
+
+# Check if OPENAI_API_KEY is set
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "Error: OPENAI_API_KEY environment variable is not set"
+    echo "Please export OPENAI_API_KEY=<your-api-key>"
+    exit 1
+fi
+
+# Default values
+SIMULATION_NAME="summer_vacation"
+INTERACTIVE=false
+REDIS_HOST="${REDIS_HOST:-localhost}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --simulation-name|-s)
+            SIMULATION_NAME="$2"
+            shift 2
+            ;;
+        --interactive|-i)
+            INTERACTIVE=true
+            shift
+            ;;
+        --redis-host)
+            REDIS_HOST="$2"
+            shift 2
+            ;;
+        --redis-port)
+            REDIS_PORT="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Run the development Docker container with source code mounted"
+            echo ""
+            echo "Options:"
+            echo "  -s, --simulation-name NAME  Simulation name (default: summer_vacation)"
+            echo "  -i, --interactive           Start interactive shell instead of running simulation"
+            echo "  --redis-host HOST           Redis host (default: localhost)"
+            echo "  --redis-port PORT           Redis port (default: 6379)"
+            echo "  -h, --help                  Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                              # Run simulation with defaults"
+            echo "  $0 -i                           # Start interactive shell"
+            echo "  $0 -s crime_detective          # Run with custom simulation"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Running autobox-engine dev container..."
+
+if [ "$INTERACTIVE" = true ]; then
+    echo "Starting interactive shell..."
+    docker run \
+        --rm \
+        -it \
+        -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+        -e REDIS_HOST="$REDIS_HOST" \
+        -e REDIS_PORT="$REDIS_PORT" \
+        -e NODE_ENV=development \
+        -v "$(pwd):/app" \
+        -w /app \
+        "autobox-engine:dev-latest" \
+        /bin/sh
+else
+    echo "Simulation: $SIMULATION_NAME"
+    echo "Redis: $REDIS_HOST:$REDIS_PORT"
+    
+    docker run \
+        --rm \
+        -it \
+        -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+        -e REDIS_HOST="$REDIS_HOST" \
+        -e REDIS_PORT="$REDIS_PORT" \
+        -e NODE_ENV=development \
+        -v "$(pwd):/app" \
+        -w /app \
+        "autobox-engine:dev-latest" \
+        yarn dev --simulation-name="$SIMULATION_NAME"
+fi

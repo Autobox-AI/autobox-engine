@@ -45,3 +45,7 @@ tests/temp-configs/
 
 # Build artifacts
 *.tsbuildinfo
+
+# Claude
+.serena/
+.claude/

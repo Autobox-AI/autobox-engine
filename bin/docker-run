@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Check if OPENAI_API_KEY is set
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "Error: OPENAI_API_KEY environment variable is not set"
+    echo "Please export OPENAI_API_KEY=<your-api-key>"
+    exit 1
+fi
+
+# Default values
+SIMULATION_NAME="summer_vacation"
+IMAGE_TAG="latest"
+HOST_PORT=""
+REDIS_HOST="${REDIS_HOST:-host.docker.internal}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+DAEMON_MODE=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --simulation-name|-s)
+            SIMULATION_NAME="$2"
+            shift 2
+            ;;
+        --daemon|-d)
+            DAEMON_MODE="--daemon"
+            shift
+            ;;
+        --tag|-t)
+            IMAGE_TAG="$2"
+            shift 2
+            ;;
+        --host-port|-p)
+            HOST_PORT="$2"
+            shift 2
+            ;;
+        --redis-host)
+            REDIS_HOST="$2"
+            shift 2
+            ;;
+        --redis-port)
+            REDIS_PORT="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  -s, --simulation-name NAME  Simulation name (default: summer_vacation)"
+            echo "  -d, --daemon               Keep server alive after simulation (default: false)"
+            echo "  -t, --tag TAG              Docker image tag (default: latest)"
+            echo "  -p, --host-port PORT       Host port to bind (default: auto-detect from PORT env or 3000)"
+            echo "  --redis-host HOST          Redis host (default: host.docker.internal)"
+            echo "  --redis-port PORT          Redis port (default: 6379)"
+            echo "  -h, --help                 Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Use PORT from environment or default to 3000
+SERVER_PORT="${PORT:-3000}"
+
+# Function to find a free port
+find_free_port() {
+    local start_port=$1
+    local port=$start_port
+    local max_attempts=100
+    local attempt=0
+
+    # Works on both macOS and Linux
+    while [ $attempt -lt $max_attempts ]; do
+        if ! nc -z localhost "$port" 2>/dev/null; then
+            echo "$port"
+            return 0
+        fi
+        port=$((port + 1))
+        attempt=$((attempt + 1))
+    done
+
+    echo 0
+    return 1
+}
+
+# Auto-detect free port if not specified
+if [ -z "$HOST_PORT" ]; then
+    HOST_PORT=$(find_free_port "$SERVER_PORT")
+    if [ "$HOST_PORT" = "0" ]; then
+        echo "Warning: Could not find a free port in range $SERVER_PORT-$((SERVER_PORT + 100))"
+        echo "Docker will assign a random available port"
+        HOST_PORT=""
+    elif [ "$HOST_PORT" != "$SERVER_PORT" ]; then
+        echo "Note: Port $SERVER_PORT is in use, using port $HOST_PORT on host instead"
+    fi
+fi
+
+echo "Running autobox-engine container..."
+echo "Simulation: $SIMULATION_NAME"
+echo "Server port: $SERVER_PORT"
+echo "Redis: $REDIS_HOST:$REDIS_PORT"
+if [ -n "$DAEMON_MODE" ]; then
+    echo "Mode: DAEMON (server stays alive after simulation)"
+fi
+if [ -n "$HOST_PORT" ]; then
+    echo "Host port: $HOST_PORT -> Container port: $SERVER_PORT"
+else
+    echo "Host port: Docker will assign a random available port"
+fi
+
+# Prepare port arguments
+if [ -n "$HOST_PORT" ]; then
+    PORT_ARGS=(-p "$HOST_PORT:$SERVER_PORT")
+else
+    PORT_ARGS=(-P)
+fi
+
+# Run container
+docker run \
+    --rm \
+    -it \
+    "${PORT_ARGS[@]}" \
+    -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+    -e REDIS_HOST="$REDIS_HOST" \
+    -e REDIS_PORT="$REDIS_PORT" \
+    -e PORT="$SERVER_PORT" \
+    -e NODE_ENV=production \
+    -e JWT_SECRET="${JWT_SECRET:-autobox-default-secret}" \
+    -e JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-7d}" \
+    -v "$(pwd)/examples/simulations:/app/examples/simulations:ro" \
+    -v "$(pwd)/examples/metrics:/app/examples/metrics:ro" \
+    -v "$(pwd)/logs:/app/logs" \
+    "autobox-engine:${IMAGE_TAG}" \
+    --config=/app/examples \
+    --simulation-name="$SIMULATION_NAME" \
+    $DAEMON_MODE

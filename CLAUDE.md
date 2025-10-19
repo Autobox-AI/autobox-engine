@@ -36,6 +36,18 @@ yarn format          # Format code with Prettier
 yarn test            # Run tests (placeholder - not yet implemented)
 ```
 
+### Docker (see DOCKER.md for full details)
+```bash
+yarn docker:build         # Build production image
+yarn docker:build:dev     # Build development image
+yarn docker:run           # Run production container
+yarn docker:run:dev       # Run dev container with hot-reload
+yarn docker:run:exit      # Run and exit on completion
+yarn docker:clean         # Clean up Docker images
+yarn docker:clean:all     # Remove all images including dev
+```
+
+
 ### Running Simulations
 ```bash
 # Development mode with example configs
@@ -353,6 +365,10 @@ Located in `src/api/routes/index.ts`:
 ### Important Notes
 
 - **Redis Required**: Engine depends on Redis for BullMQ queues
+- **Docker Support**: Full Docker support available with production and dev images (see DOCKER.md)
+  - Production: Multi-stage build with optimized image size
+  - Development: Hot-reload support with source mounting
+  - Scripts: `yarn docker:build`, `yarn docker:run`, `yarn docker:clean`
 - **OpenAI API**: All agents use OpenAI's chat completions (configurable model per agent)
   - Common models: `gpt-4o-mini`, `gpt-5-nano`, `o4-mini`
 - **No Concurrent Simulations**: Current implementation supports one simulation at a time

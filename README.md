@@ -78,6 +78,7 @@ This is a complete rewrite of the Python/Thespian-based engine, migrating from a
 - **Node.js** 18+ and **Yarn** 4.x
 - **Redis** server running locally or remotely
 - **OpenAI API Key** with access to GPT models
+- **Docker** (optional, for containerized deployment)
 
 ### Installation
 
@@ -199,6 +200,27 @@ yarn format
 # Run tests (not yet implemented)
 yarn test
 ```
+
+### Docker
+
+```bash
+# Build images
+yarn docker:build              # Production image
+yarn docker:build:dev          # Development image
+
+# Run containers (requires OPENAI_API_KEY)
+export OPENAI_API_KEY=your-key
+yarn docker:run                # Production container
+yarn docker:run:dev            # Dev container with hot-reload
+yarn docker:run:exit           # Run and exit on completion
+
+# Clean up
+yarn docker:clean              # Remove latest image
+yarn docker:clean:all          # Remove all images including dev
+```
+
+For detailed Docker usage, configuration, and troubleshooting, see [DOCKER.md](DOCKER.md).
+
 
 ## API Endpoints
 
@@ -368,6 +390,68 @@ autobox-engine-ts/
 2. Add type guard function (e.g., `isMyMessageType()`)
 3. Update agent handlers to process new type
 
+## Docker Deployment
+
+The engine includes complete Docker support for both development and production environments. Docker provides isolation, reproducibility, and easy deployment.
+
+### Quick Docker Start
+
+```bash
+# Build production image
+yarn docker:build
+
+# Set environment variables
+export OPENAI_API_KEY=your-key-here
+
+# Run with default simulation
+yarn docker:run
+
+# Run specific simulation
+./bin/docker-run --simulation-name crime_detective
+```
+
+### Docker Features
+
+- **Multi-stage Production Build**: Optimized image size (~200MB)
+- **Development Image**: Hot-reload support with source mounting
+- **Auto Port Detection**: Automatically finds free ports
+- **Volume Mounting**: Persists logs and configuration
+- **Health Checks**: Built-in HTTP health endpoint
+- **Redis Integration**: Configured for BullMQ connectivity
+
+### Docker Commands
+
+| Command | Description |
+|---------|-------------|
+| `yarn docker:build` | Build production image |
+| `yarn docker:build:dev` | Build development image |
+| `yarn docker:run` | Run production container |
+| `yarn docker:run:dev` | Run dev container with hot-reload |
+| `yarn docker:run:exit` | Run and exit on completion |
+| `yarn docker:clean` | Remove latest image |
+| `yarn docker:clean:all` | Remove all images |
+
+### Docker with Redis
+
+If Redis is running in another Docker container:
+
+```bash
+# Start Redis
+docker run -d --name redis -p 6379:6379 redis:alpine
+
+# Run engine (use host.docker.internal on macOS/Windows)
+./bin/docker-run --redis-host host.docker.internal
+```
+
+For complete Docker documentation including:
+- Detailed script options
+- Volume mounting configuration
+- Multi-platform builds
+- Troubleshooting guide
+- Comparison with Python engine
+
+See **[DOCKER.md](DOCKER.md)**
+
 ## Troubleshooting
 
 ### Redis Connection Issues
@@ -406,7 +490,8 @@ docker run -d -p 6379:6379 redis:alpine
 ## Roadmap
 
 - [ ] Implement comprehensive test suite
-- [ ] Add Docker Compose setup
+- [x] Docker support with production and development images
+- [ ] Add Docker Compose setup for Redis + Engine orchestration
 - [ ] Support for multiple concurrent simulations
 - [ ] Persistent storage for simulation history
 - [ ] Real-time WebSocket updates
