@@ -2,7 +2,7 @@
 
 > Multi-agent AI simulation runtime engine powered by TypeScript, BullMQ, and OpenAI
 
-[![Tests](https://github.com/margostino/autobox/actions/workflows/engine-ts-tests.yml/badge.svg?branch=main)](https://github.com/margostino/autobox/actions/workflows/engine-ts-tests.yml)
+[![Tests](https://github.com/margostino/autobox-engine-ts/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/margostino/autobox-engine-ts/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/margostino/autobox/branch/main/graph/badge.svg?flag=autobox-engine-ts)](https://codecov.io/gh/margostino/autobox)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)

@@ -2,7 +2,6 @@
 
 set -e
 
-# Check if OPENAI_API_KEY is set
 if [ -z "$OPENAI_API_KEY" ]; then
     echo "Error: OPENAI_API_KEY environment variable is not set"
     echo "Please export OPENAI_API_KEY=<your-api-key>"
@@ -50,7 +49,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -s, --simulation-name NAME  Simulation name (default: summer_vacation)"
             echo "  -d, --daemon               Keep server alive after simulation (default: false)"
             echo "  -t, --tag TAG              Docker image tag (default: latest)"
-            echo "  -p, --host-port PORT       Host port to bind (default: auto-detect from PORT env or 3000)"
+            echo "  -p, --host-port PORT       Host port to bind (default: auto-detect from server.json)"
             echo "  --redis-host HOST          Redis host (default: host.docker.internal)"
             echo "  --redis-port PORT          Redis port (default: 6379)"
             echo "  -h, --help                 Show this help message"
@@ -63,10 +62,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Use PORT from environment or default to 3000
-SERVER_PORT="${PORT:-3000}"
+SERVER_CONFIG="examples/server/server.json"
+SERVER_PORT=$(grep -o '"port":[[:space:]]*[0-9]*' "$SERVER_CONFIG" | grep -o '[0-9]*$')
+if [ -z "$SERVER_PORT" ]; then
+    echo "Warning: Could not determine port from server config, using default 9000"
+    SERVER_PORT=9000
+fi
 
-# Function to find a free port
 find_free_port() {
     local start_port=$1
     local port=$start_port
@@ -112,14 +114,12 @@ else
     echo "Host port: Docker will assign a random available port"
 fi
 
-# Prepare port arguments
 if [ -n "$HOST_PORT" ]; then
     PORT_ARGS=(-p "$HOST_PORT:$SERVER_PORT")
 else
     PORT_ARGS=(-P)
 fi
 
-# Run container
 docker run \
     --rm \
     -it \
