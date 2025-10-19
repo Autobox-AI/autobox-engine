@@ -10,7 +10,7 @@ if [ -z "$OPENAI_API_KEY" ]; then
 fi
 
 # Default values
-SIMULATION_NAME="summer_vacation"
+SIMULATION_NAME="gift_choice"
 IMAGE_TAG="latest"
 HOST_PORT=""
 REDIS_HOST="${REDIS_HOST:-host.docker.internal}"
