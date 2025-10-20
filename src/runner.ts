@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import process from 'process';
 import { loadConfig, logger } from './config';
 import { runSimulation } from './core';
+import { Config } from './schemas';
 
 const program = new Command();
 
@@ -14,7 +15,7 @@ program
   .option('-s, --simulation-name <simulationName>', 'simulation name', 'summer_vacation')
   .parse(process.argv);
 
-export const startSimulation = async (): Promise<void> => {
+export const getConfig = (): { config: Config; isDaemon: boolean } => {
   const options = program.opts();
   const configPath = options.config;
   const isDaemon = options.daemon;
@@ -33,6 +34,12 @@ export const startSimulation = async (): Promise<void> => {
     configPath,
   });
 
+  logger.info(`🔌 Server will start on ${config.server.host}:${config.server.port}`);
+
+  return { config, isDaemon };
+};
+
+export const startSimulation = async (config: Config, isDaemon: boolean): Promise<void> => {
   try {
     await runSimulation(config, { daemon: isDaemon });
 

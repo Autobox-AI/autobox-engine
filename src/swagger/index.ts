@@ -1,1 +1,1 @@
-export { apiSpec } from './apiSpec';
+export { getApiSpec } from './apiSpec';

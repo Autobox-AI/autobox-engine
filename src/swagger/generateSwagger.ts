@@ -21,7 +21,7 @@ function getOpenApiDocumentation() {
       description: 'API to interact with Autobox Engine to run AI agents based simulations.',
       contact: {
         name: 'Autobox Team',
-        email: 'support@autobox.io',
+        email: 'support@autobox.ai',
       },
     },
     servers: [

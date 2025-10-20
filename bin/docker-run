@@ -15,6 +15,7 @@ HOST_PORT=""
 REDIS_HOST="${REDIS_HOST:-host.docker.internal}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 DAEMON_MODE=""
+DOCKER_NETWORK="autobox-network"  # Default to autobox-network for Redis connectivity
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -42,6 +43,10 @@ while [[ $# -gt 0 ]]; do
             REDIS_PORT="$2"
             shift 2
             ;;
+        --network|-n)
+            DOCKER_NETWORK="$2"
+            shift 2
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -50,8 +55,9 @@ while [[ $# -gt 0 ]]; do
             echo "  -d, --daemon               Keep server alive after simulation (default: false)"
             echo "  -t, --tag TAG              Docker image tag (default: latest)"
             echo "  -p, --host-port PORT       Host port to bind (default: auto-detect from server.json)"
-            echo "  --redis-host HOST          Redis host (default: host.docker.internal)"
+            echo "  --redis-host HOST          Redis host (default: host.docker.internal, or 'redis' if using --network)"
             echo "  --redis-port PORT          Redis port (default: 6379)"
+            echo "  -n, --network NAME         Docker network to join (default: autobox-network)"
             echo "  -h, --help                 Show this help message"
             exit 0
             ;;
@@ -120,10 +126,70 @@ else
     PORT_ARGS=(-P)
 fi
 
+# If network is specified, ensure it exists and setup Redis
+if [ -n "$DOCKER_NETWORK" ]; then
+    # Create network if it doesn't exist
+    if ! docker network inspect "$DOCKER_NETWORK" &>/dev/null; then
+        echo "Creating Docker network: $DOCKER_NETWORK"
+        docker network create "$DOCKER_NETWORK"
+    fi
+
+    # Check if Redis container exists and is running on this network
+    if ! docker ps --format '{{.Names}}' | grep -q "^autobox-redis$"; then
+        # Check if Redis container exists but is stopped
+        if docker ps -a --format '{{.Names}}' | grep -q "^autobox-redis$"; then
+            echo "Starting existing Redis container..."
+            docker start autobox-redis
+            # Connect to network if not already connected
+            docker network connect "$DOCKER_NETWORK" autobox-redis 2>/dev/null || true
+        else
+            echo "Starting Redis container on network: $DOCKER_NETWORK"
+            docker run -d \
+                --name autobox-redis \
+                --network "$DOCKER_NETWORK" \
+                -p 6379:6379 \
+                redis:alpine
+        fi
+    else
+        # Redis is running, ensure it's on the network
+        docker network connect "$DOCKER_NETWORK" autobox-redis 2>/dev/null || true
+    fi
+
+    # Always wait for Redis to be ready
+    echo "Waiting for Redis to be ready..."
+    for i in {1..30}; do
+        if docker exec autobox-redis redis-cli ping &>/dev/null; then
+            echo "Redis is ready!"
+            break
+        fi
+        sleep 1
+    done
+
+    # Get Redis container IP for explicit host mapping (bypasses DNS)
+    REDIS_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' autobox-redis)
+    if [ -z "$REDIS_IP" ]; then
+        echo "Error: Could not get Redis container IP"
+        exit 1
+    fi
+    echo "Redis IP: $REDIS_IP"
+
+    # Use 'redis' as hostname when on network
+    if [ "$REDIS_HOST" = "host.docker.internal" ]; then
+        REDIS_HOST="redis"
+    fi
+    echo "Network: $DOCKER_NETWORK (Redis hostname: $REDIS_HOST -> $REDIS_IP)"
+
+    # Use explicit host mapping to bypass DNS
+    NETWORK_ARGS=(--network "$DOCKER_NETWORK" --add-host "redis:$REDIS_IP")
+else
+    NETWORK_ARGS=()
+fi
+
 docker run \
     --rm \
     -it \
     "${PORT_ARGS[@]}" \
+    "${NETWORK_ARGS[@]}" \
     -e OPENAI_API_KEY="$OPENAI_API_KEY" \
     -e REDIS_HOST="$REDIS_HOST" \
     -e REDIS_PORT="$REDIS_PORT" \
@@ -133,6 +199,7 @@ docker run \
     -e JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-7d}" \
     -v "$(pwd)/examples/simulations:/app/examples/simulations:ro" \
     -v "$(pwd)/examples/metrics:/app/examples/metrics:ro" \
+    -v "$(pwd)/examples/server:/app/examples/server:ro" \
     -v "$(pwd)/logs:/app/logs" \
     "autobox-engine:${IMAGE_TAG}" \
     --config=/app/examples \

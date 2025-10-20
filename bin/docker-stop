@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "Stopping Autobox Engine containers..."
+
+# Stop and remove autobox-engine container(s)
+echo "Stopping autobox-engine containers..."
+docker ps -a --filter "ancestor=autobox-engine:latest" --format "{{.ID}}" | xargs -r docker stop
+docker ps -a --filter "ancestor=autobox-engine:latest" --format "{{.ID}}" | xargs -r docker rm
+
+# Stop and remove autobox-redis container if it exists
+if docker ps -a --format '{{.Names}}' | grep -q "^autobox-redis$"; then
+    echo "Stopping autobox-redis container..."
+    docker stop autobox-redis
+    docker rm autobox-redis
+fi
+
+# Optional: Remove the network if no other containers are using it
+if docker network inspect autobox-network &>/dev/null; then
+    echo "Removing autobox-network..."
+    docker network rm autobox-network 2>/dev/null || echo "Network still in use or already removed"
+fi
+
+echo "✅ All Autobox containers stopped and removed"

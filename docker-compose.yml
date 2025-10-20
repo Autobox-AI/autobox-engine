@@ -1,0 +1,69 @@
+services:
+  redis:
+    image: redis:alpine
+    container_name: autobox-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - autobox-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  autobox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: autobox-engine:latest
+    container_name: autobox-engine
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=9000
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-autobox-default-secret}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+    volumes:
+      - ./examples/simulations:/app/examples/simulations:ro
+      - ./examples/metrics:/app/examples/metrics:ro
+      - ./examples/server:/app/examples/server:ro
+      - ./logs:/app/logs
+    ports:
+      - "9000:9000"
+    command: >
+      --config=/app/examples
+      --simulation-name=gift_choice
+    networks:
+      - autobox-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  autobox-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: autobox-engine:dev
+    container_name: autobox-engine-dev
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app:rw
+      - ./logs:/app/logs
+    command: >
+      uv run python -m autobox.main
+      --config examples/simulations/summer_vacation.json
+      --metrics examples/metrics/summer_vacation.json
+    networks:
+      - autobox-network
+    profiles:
+      - dev
+
+networks:
+  autobox-network:
+    driver: bridge
