@@ -54,11 +54,12 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }} # Optional for public repos, but improves reliability
+          file: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
+          verbose: true
 
       - name: Archive test results
         if: always()
