@@ -2,8 +2,8 @@
 
 > Multi-agent AI simulation runtime engine powered by TypeScript, BullMQ, and OpenAI
 
-[![Tests](https://github.com/margostino/autobox-engine-ts/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/margostino/autobox-engine-ts/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/margostino/autobox/branch/main/graph/badge.svg?flag=autobox-engine-ts)](https://codecov.io/gh/margostino/autobox)
+[![Tests](https://github.com/Autobox-AI/autobox-engine/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Autobox-AI/autobox-engine/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/Autobox-AI/autobox-engine/branch/main/graph/badge.svg)](https://codecov.io/gh/Autobox-AI/autobox-engine)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-ISC-lightgrey.svg)](LICENSE)
@@ -220,7 +220,6 @@ yarn docker:clean:all          # Remove all images including dev
 ```
 
 For detailed Docker usage, configuration, and troubleshooting, see [DOCKER.md](DOCKER.md).
-
 
 ## API Endpoints
 
@@ -444,6 +443,7 @@ docker run -d --name redis -p 6379:6379 redis:alpine
 ```
 
 For complete Docker documentation including:
+
 - Detailed script options
 - Volume mounting configuration
 - Multi-platform builds

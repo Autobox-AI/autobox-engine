@@ -12,7 +12,7 @@ program
   .version('0.0.1')
   .option('-c, --config <config>', 'simulation config file', '/autobox/config')
   .option('-d, --daemon', 'keep server alive after simulation completes', false)
-  .option('-s, --simulation-name <simulationName>', 'simulation name', 'summer_vacation')
+  .option('-s, --simulation-name <simulationName>', 'simulation name', 'gift_choice')
   .parse(process.argv);
 
 export const getConfig = (): { config: Config; isDaemon: boolean } => {
