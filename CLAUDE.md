@@ -33,7 +33,12 @@ yarn start:cli       # Run with CLI interface
 yarn lint            # Run ESLint
 yarn lint:fix        # Auto-fix ESLint issues
 yarn format          # Format code with Prettier
-yarn test            # Run tests (placeholder - not yet implemented)
+yarn test            # Run all tests with Jest
+yarn test:unit       # Run unit tests only
+yarn test:integration # Run integration tests only
+yarn test:watch      # Run tests in watch mode
+yarn test:coverage   # Run tests with coverage report
+yarn test:ci         # Run tests in CI mode
 ```
 
 ### Docker (see DOCKER.md for full details)
@@ -179,11 +184,12 @@ await Promise.race([
 await Promise.all([
   orchestrator.shutdown(),
   planner.shutdown(),
-  evaluator.shutdown(),          // NEW: Evaluator shutdown
   reporter.shutdown(),
   ...workers.map(w => w.shutdown())
 ]);
 await messageBroker.close();
+
+// NOTE: Evaluator shutdown is not yet implemented in the actual code
 
 // 5. Clean up (unless daemon mode)
 if (!daemon) {
@@ -241,10 +247,12 @@ Simulations require three JSON configs (see `examples/` directory):
 
    **Key Fields**:
    - `shutdown_grace_period_seconds`: Time to wait for graceful shutdown (default: 5)
-   - `mailbox.max_size`: Maximum queue size per agent
+   - `mailbox`: Legacy field present in example configs but NOT validated by schema (may be ignored)
    - `workers[].instruction`: Optional instruction field for worker agents
-   - `workers[].description`: Human-readable description of worker's role
+   - `workers[].description`: Optional human-readable description of worker's role
+   - `workers[].context`: Role and backstory for the worker agent
    - `evaluator`: New agent for metrics evaluation
+   - `logging`: Logging configuration (verbose, log_path, log_file)
 
 2. **Metrics Config** (`examples/metrics/{name}.json`): Defines success criteria and measurement
 
@@ -269,7 +277,9 @@ All communication uses the `Message` discriminated union:
 type Message =
   | TextMessage         // Content-bearing agent messages
   | SignalMessage       // Control signals (START, STOP, ABORT, STATUS)
-  | InstructionMessage  // External instructions to agents
+  | InstructionMessage  // External instructions to agents (with priority field)
+
+// InstructionMessage includes priority: 'override' | 'supplement' (default: 'supplement')
 
 // Message routing via MessageBroker
 messageBroker.send({
@@ -321,7 +331,9 @@ Located in `src/api/routes/index.ts`:
 - `params.ts` - Parameter types for prompt generation
 - `index.ts` - Exports
 
-**Structured Responses**: Agents that need structured output (orchestrator, planner, evaluator) use Zod schemas with `zodResponseFormat()` for guaranteed JSON structure.
+**⚠️ Note**: The orchestrator prompt (`src/core/llm/prompts/orchestrator/v0.0.1/prompt.ts`) currently returns `'TODO'` and is not fully implemented. It also lacks a `schema.ts` file.
+
+**Structured Responses**: Agents that need structured output (planner, evaluator) use Zod schemas with `zodResponseFormat()` for guaranteed JSON structure. Orchestrator does not currently have a schema.
 
 **Error Handling**: Workers automatically catch errors and log via Winston. Failed jobs are tracked by BullMQ.
 
@@ -336,13 +348,49 @@ Located in `src/api/routes/index.ts`:
 
 ### Testing Strategy
 
-**Current Status**: Tests are not yet implemented. The `yarn test` command is a placeholder.
+**Current Status**: ✅ Tests are fully implemented using Jest with TypeScript support via `ts-jest`.
 
-**Future Testing Approach**:
-- Unit tests for message passing, memory, and agent logic
-- Integration tests for full simulation flows
-- Mock OpenAI API responses for deterministic testing
-- Use Jest as testing framework (already in devDependencies)
+**Test Organization**:
+```
+tests/
+├── setup.ts                    # Global test configuration
+├── fixtures/                   # Reusable test data factories
+│   ├── messages.ts             # Message factory functions
+│   └── configs.ts              # Configuration factory functions
+├── unit/                       # Unit tests (isolated components)
+│   ├── schemas/                # Schema validation tests
+│   ├── core/                   # Core business logic (memory, registry)
+│   ├── transformations/        # Data transformation tests
+│   ├── config/                 # Configuration loader tests
+│   └── utils/                  # Utility function tests
+└── integration/                # Integration tests (multiple components)
+    ├── api/                    # API endpoint tests
+    └── schemas/                # End-to-end schema validation
+```
+
+**What's Tested**:
+- ✅ Message schemas and type guards (`tests/unit/schemas/message.test.ts`)
+- ✅ Memory system (`tests/unit/core/memory.test.ts`)
+- ✅ Simulation registry (`tests/unit/core/simulationRegistry.test.ts`)
+- ✅ Configuration loader (`tests/unit/config/loader.test.ts`)
+- ✅ Transformations (`tests/unit/transformations/memoryToHistory.test.ts`)
+- ✅ Zod utilities (`tests/unit/utils/zodParse.test.ts`)
+- ✅ API handlers (`tests/integration/api/handlers.test.ts`)
+- ✅ Schema validation (`tests/integration/schemas/validation.test.ts`)
+
+**Coverage Thresholds** (configured in `jest.config.js`):
+- Branches: 30%
+- Functions: 20%
+- Lines: 50%
+- Statements: 55%
+
+**What's NOT Tested** (intentionally excluded for now):
+- ❌ BullMQ integration (requires Redis infrastructure)
+- ❌ OpenAI API calls (external dependency, expensive)
+- ❌ Agent handlers (complex orchestration, future mocks needed)
+- ❌ Full simulation lifecycle (future E2E test suite)
+
+**See Also**: `tests/README.md` for comprehensive testing documentation
 
 ### Development Patterns
 
@@ -376,3 +424,9 @@ Located in `src/api/routes/index.ts`:
 - **Message Throttling**: 200ms delay between messages via simple `setTimeout()` to prevent queue flooding
 - **Port Configuration**: Default port is 3000, configurable via `PORT` environment variable
 - **Simulation Registry**: Singleton pattern means only one active simulation context at a time
+
+### Known Issues / TODO
+
+- ⚠️ **Evaluator Shutdown Missing**: The evaluator agent is created but its `shutdown()` method is not called in `runSimulation()` cleanup (see `src/core/simulation/runSimulation.ts:30-34`). This may cause graceful shutdown to be incomplete.
+- ⚠️ **Orchestrator Prompt Placeholder**: The orchestrator prompt at `src/core/llm/prompts/orchestrator/v0.0.1/prompt.ts` only returns `'TODO'` and needs implementation.
+- ℹ️ **Mailbox Config Ignored**: The `mailbox` field in simulation configs is present in examples but not validated by `SimulationConfigSchema`, suggesting it may be a legacy field that's no longer used.
