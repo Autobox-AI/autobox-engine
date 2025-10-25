@@ -18,6 +18,14 @@ coverage:
         target: 80%
         threshold: 5%
 
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      method: false
+      macro: false
+
 comment:
   layout: "reach,diff,flags,files,footer"
   behavior: default
