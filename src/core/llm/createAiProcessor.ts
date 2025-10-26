@@ -5,7 +5,7 @@ import {
   ChatCompletionMessageParam,
 } from 'openai/resources';
 import { z } from 'zod';
-import { DEFAULT_OPEN_AI_MODEL, logger } from '../../config';
+import { DEFAULT_OPEN_AI_MODEL, env, logger } from '../../config';
 
 export const createAiProcessor = ({
   systemPrompt,
@@ -16,7 +16,10 @@ export const createAiProcessor = ({
   model?: string;
   schema?: z.ZodType<any>;
 }) => {
-  const openai: OpenAI = new OpenAI();
+  const openai: OpenAI = new OpenAI({
+    apiKey: env.OPENAI_API_KEY,
+    baseURL: env.OPENAI_BASE_URL,
+  });
 
   const think = async ({
     name,
@@ -25,7 +28,7 @@ export const createAiProcessor = ({
     name: string;
     messages: ChatCompletionMessageParam[];
   }): Promise<unknown> => {
-    logger.info(`[${name}] thinking...`);
+    logger.info(`[${name}] thinking (${model})...`);
 
     const completionMessages = [
       { role: 'system', content: systemPrompt } as ChatCompletionMessageParam,

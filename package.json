@@ -4,7 +4,7 @@
   "description": "TypeScript implementation of Autobox simulation runtime",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch --clear-screen=true src/index.ts --config=./examples",
+    "dev": "tsx watch --clear-screen=true src/index.ts --config=./examples --simulation-name=gift_choice",
     "build": "tsc",
     "start": "node dist/index.js",
     "start:cli": "node dist/index.js --cli",

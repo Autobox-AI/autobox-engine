@@ -11,7 +11,7 @@
       "max_size": 400
     },
     "llm": {
-      "model": "gpt-oss:20b"
+      "model": "deepseek-r1:7b"
     }
   },
   "reporter": {
@@ -20,7 +20,7 @@
       "max_size": 400
     },
     "llm": {
-      "model": "gpt-oss:20b"
+      "model": "deepseek-r1:7b"
     }
   },
   "planner": {
@@ -29,7 +29,7 @@
       "max_size": 400
     },
     "llm": {
-      "model": "gpt-oss:20b"
+      "model": "deepseek-r1:7b"
     }
   },
   "orchestrator": {
@@ -38,7 +38,7 @@
       "max_size": 400
     },
     "llm": {
-      "model": "gpt-oss:20b"
+      "model": "deepseek-r1:7b"
     }
   },
   "workers": [
@@ -48,7 +48,7 @@
       "role": "Ana is Maria's friend. Pick quick no much thinking. She will buy.",
       "backstory": "She is passionate about reading and books.",
       "llm": {
-        "model": "gpt-oss:20b"
+        "model": "deepseek-r1:7b"
       },
       "mailbox": {
         "max_size": 100
@@ -60,7 +60,7 @@
       "role": "John is Maria's friend. Pick quick no much thinking.",
       "backstory": "He is passionate about books of any kind.",
       "llm": {
-        "model": "gpt-oss:20b"
+        "model": "deepseek-r1:7b"
       },
       "mailbox": {
         "max_size": 100

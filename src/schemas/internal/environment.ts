@@ -19,6 +19,8 @@ export const EnvironmentSchema = z.object({
   JWT_EXPIRES_IN: z.string().min(1),
   CONFIG_PATH: z.string().default('/autobox/config'),
   LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
+  OPENAI_API_KEY: z.string().min(1),
+  OPENAI_BASE_URL: z.string().url().default('https://api.openai.com/v1'),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;
