@@ -19,8 +19,18 @@ export const EnvironmentSchema = z.object({
   JWT_EXPIRES_IN: z.string().min(1),
   CONFIG_PATH: z.string().default('/autobox/config'),
   LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
-  OPENAI_API_KEY: z.string().min(1),
-  OPENAI_BASE_URL: z.string().url().default('https://api.openai.com/v1'),
+
+  // LLM Provider Configuration
+  // ollama: Local models (gpt-oss:20b, deepseek-r1:7b, llama2:latest)
+  // openai: OpenAI cloud API (gpt-4o, gpt-4o-mini, etc.)
+  LLM_PROVIDER: z.enum(['ollama', 'openai']).default('ollama'),
+
+  // Ollama Configuration (local models)
+  OLLAMA_URL: z.string().default('http://localhost:11434/v1'),
+
+  // OpenAI Configuration (cloud API - optional)
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_BASE_URL: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;
